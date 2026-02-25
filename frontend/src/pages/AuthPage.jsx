@@ -1,135 +1,96 @@
 import React, { useState } from 'react'
-import { supabase } from '../lib/supabase'
-import toast from 'react-hot-toast'
+import { useStore } from '../lib/store'
 
 export default function AuthPage() {
-  const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('')
+  const { signIn, signUp } = useStore()
+  const [mode, setMode]       = useState('login')
+  const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handle = async () => {
     setLoading(true)
-
+    setError('')
     try {
-      if (mode === 'register') {
-        const { data, error } = await supabase.auth.signUp({ email, password })
-        if (error) throw error
-
-        // Create profile
-        await supabase.from('profiles').insert({
-          id: data.user.id,
-          username: username.toLowerCase().replace(/\s/g, '_'),
-          display_name: username,
-          gems: 100
-        })
-
-        // Grant newcomer badge
-        await supabase.from('user_badges').insert({ user_id: data.user.id, badge_id: 'newcomer' })
-
-        toast.success('Account created! Welcome to LastLimb!')
+      if (mode === 'login') {
+        await signIn(email, password)
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-        toast.success('Welcome back!')
+        await signUp(email, password, username)
       }
-    } catch (err) {
-      toast.error(err.message)
+    } catch (e) {
+      setError(e.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#0a0a0f' }}>
-      {/* Background grid */}
-      <div className="fixed inset-0 opacity-10" style={{
-        backgroundImage: `linear-gradient(rgba(0,255,245,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,245,0.3) 1px, transparent 1px)`,
-        backgroundSize: '40px 40px'
+    <div className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: 'linear-gradient(160deg, #080c16 0%, #0a101e 50%, #080c16 100%)' }}>
+
+      {/* Background decoration */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse at 50% 80%, rgba(0,168,255,0.06) 0%, transparent 60%)',
       }} />
 
-      <div className="relative z-10 w-full max-w-md">
+      <div className="w-full max-w-sm relative">
+
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-4 animate-float">🪢</div>
-          <h1 className="font-pixel text-3xl text-white mb-2" style={{ textShadow: '0 0 20px #00fff5, 0 0 40px #00fff5' }}>
-            LAST<span style={{ color: '#ff006e' }}>LIMB</span>
-          </h1>
-          <p className="text-xs text-gray-400 font-mono tracking-widest">THE ULTIMATE HANGMAN ARENA</p>
+        <div className="text-center mb-10">
+          <div className="fn-heading mb-2" style={{ fontSize: 48, color: 'white', lineHeight: 1 }}>
+            LAST<span style={{ color: '#00a8ff' }}>LIMB</span>
+          </div>
+          <div style={{ fontFamily: 'Barlow Condensed', color: 'rgba(192,200,216,0.4)', fontSize: 12, letterSpacing: 3 }}>
+            MULTIPLAYER HANGMAN
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex mb-6 border-b border-gray-800">
-          {['login', 'register'].map(m => (
-            <button key={m} onClick={() => setMode(m)}
-              className={`tab-btn flex-1 text-center capitalize ${mode === m ? 'active' : ''}`}>
-              {m === 'login' ? 'Sign In' : 'Create Account'}
-            </button>
-          ))}
-        </div>
+        {/* Card */}
+        <div className="fn-card p-6" style={{ borderRadius: 4 }}>
 
-        {/* Form */}
-        <div className="arcade-card p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs text-gray-400 mb-2 font-pixel" style={{ fontSize: 9 }}>USERNAME</label>
-                <input
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="CoolPlayer99"
-                  required
-                  className="w-full bg-black border border-gray-700 focus:border-cyan-400 text-white p-3 outline-none font-mono text-sm"
-                  style={{ borderColor: 'rgba(0,255,245,0.3)' }}
-                />
-              </div>
+          {/* Mode toggle */}
+          <div className="flex mb-6" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 3, padding: 3 }}>
+            {['login', 'signup'].map(m => (
+              <button key={m} onClick={() => setMode(m)}
+                className="flex-1 py-2 transition-all"
+                style={{
+                  fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, letterSpacing: 1.5,
+                  textTransform: 'uppercase', borderRadius: 2, border: 'none', cursor: 'pointer',
+                  background: mode === m ? 'rgba(0,168,255,0.2)' : 'transparent',
+                  color: mode === m ? '#00a8ff' : 'rgba(192,200,216,0.4)',
+                }}>
+                {m === 'login' ? 'LOG IN' : 'SIGN UP'}
+              </button>
+            ))}
+          </div>
+
+          {/* Fields */}
+          <div className="flex flex-col gap-3">
+            {mode === 'signup' && (
+              <input className="fn-input" placeholder="Username" value={username}
+                onChange={e => setUsername(e.target.value)} />
             )}
-            <div>
-              <label className="block text-xs text-gray-400 mb-2 font-pixel" style={{ fontSize: 9 }}>EMAIL</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                className="w-full bg-black border text-white p-3 outline-none font-mono text-sm"
-                style={{ borderColor: 'rgba(0,255,245,0.3)' }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-2 font-pixel" style={{ fontSize: 9 }}>PASSWORD</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="w-full bg-black border text-white p-3 outline-none font-mono text-sm"
-                style={{ borderColor: 'rgba(0,255,245,0.3)' }}
-              />
-            </div>
-            <button type="submit" disabled={loading}
-              className="btn-pixel btn-cyan w-full mt-4" style={{ padding: '14px', fontSize: 11 }}>
-              {loading ? 'LOADING...' : mode === 'login' ? 'ENTER ARENA' : 'CREATE ACCOUNT'}
-            </button>
-          </form>
+            <input className="fn-input" placeholder="Email" type="email" value={email}
+              onChange={e => setEmail(e.target.value)} />
+            <input className="fn-input" placeholder="Password" type="password" value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handle()} />
+          </div>
 
-          {mode === 'login' && (
-            <p className="text-center text-xs text-gray-600 mt-4 font-mono">
-              No account?{' '}
-              <span onClick={() => setMode('register')} className="cursor-pointer" style={{ color: '#00fff5' }}>
-                Register now
-              </span>
-            </p>
+          {error && (
+            <div className="mt-3 p-3 text-sm" style={{ background: 'rgba(255,23,68,0.1)', border: '1px solid rgba(255,23,68,0.3)', borderRadius: 3, color: '#ff6b6b', fontFamily: 'Barlow', fontSize: 13 }}>
+              {error}
+            </div>
           )}
-        </div>
 
-        {/* Footer */}
-        <p className="text-center text-xs text-gray-700 mt-6 font-mono">
-          © 2025 LastLimb Arena · All rights reserved
-        </p>
+          <button onClick={handle} disabled={loading}
+            className="fn-btn fn-btn-blue w-full mt-5" style={{ fontSize: 15 }}>
+            {loading ? 'LOADING...' : mode === 'login' ? 'LOG IN' : 'CREATE ACCOUNT'}
+          </button>
+        </div>
       </div>
     </div>
   )
