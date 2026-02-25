@@ -67,7 +67,6 @@ export default function StorePage() {
 
   return (
     <div className="min-h-screen p-4 max-w-4xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-pixel text-xl" style={{ color: '#00fff5' }}>STORE</h1>
@@ -79,7 +78,6 @@ export default function StorePage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex overflow-x-auto border-b border-gray-800 mb-6">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
@@ -89,7 +87,6 @@ export default function StorePage() {
         ))}
       </div>
 
-      {/* Gem Packs */}
       {tab === 'gems' && (
         <div>
           <p className="font-mono text-xs text-gray-500 mb-4">Purchase gems to unlock cosmetics, fonts, and more.</p>
@@ -117,7 +114,6 @@ export default function StorePage() {
             ))}
           </div>
 
-          {/* Season Pass */}
           <div className="arcade-card p-6 text-center" style={{ borderColor: '#ffbe0b' }}>
             <div className="text-4xl mb-2">🎫</div>
             <div className="font-pixel text-sm mb-1 text-white">SEASON PASS</div>
@@ -138,7 +134,6 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* Cosmetic grids */}
       {['hats', 'colors', 'accessories', 'gallows', 'fonts'].includes(tab) && (
         <CosmeticGrid
           items={filterItems(tab === 'hats' ? 'hat' : tab === 'colors' ? 'color' : tab === 'accessories' ? 'accessory' : tab === 'gallows' ? 'gallows' : 'font')}
@@ -163,14 +158,18 @@ function CosmeticGrid({ items, unlockedItems, gems, onBuy, loading }) {
         return (
           <div key={item.id} className="arcade-card p-4 flex flex-col items-center text-center"
             style={{ borderColor: owned ? '#06d6a0' : `${rarityColor}44` }}>
-            {/* Rarity badge */}
             <div className="text-xs font-pixel mb-2 self-end" style={{ color: rarityColor, fontSize: 7 }}>
               {item.rarity.toUpperCase()}
             </div>
-
-            <div className="text-4xl mb-2">{item.emoji}</div>
+            <div className="mb-2 flex items-center justify-center" style={{width:64,height:64}}>
+              {item.fontPreview
+                ? <span style={{fontSize:32,color:"#fff"}}>A</span>
+                : item.image
+                  ? <img src={item.image} alt={item.name} style={{width:56,height:56,objectFit:"contain"}} />
+                  : <span className="text-4xl">{item.emoji || "?"}</span>
+              }
+            </div>
             <div className="font-mono text-xs text-white mb-1">{item.name}</div>
-
             {owned ? (
               <div className="font-pixel text-xs mt-2" style={{ color: '#06d6a0', fontSize: 8 }}>✓ OWNED</div>
             ) : (
