@@ -9,12 +9,13 @@ import StorePage from './pages/StorePage'
 import SeasonPassPage from './pages/SeasonPassPage'
 import TournamentsPage from './pages/TournamentsPage'
 import FriendsPage from './pages/FriendsPage'
+import LobbyPage from './pages/LobbyPage'
 import './styles/index.css'
 
 const NAV_ITEMS = [
-  { id: 'play',        icon: '🎮', label: 'PLAY' },
+  { id: 'lobby',       icon: '🏠', label: 'LOBBY' },
+  { id: 'play',        icon: '⚔️', label: 'PLAY' },
   { id: 'leaderboard', icon: '🏆', label: 'RANKS' },
-  { id: 'tournaments', icon: '⚔️', label: 'EVENTS' },
   { id: 'store',       icon: '🛒', label: 'STORE' },
   { id: 'season',      icon: '🎫', label: 'PASS' },
   { id: 'friends',     icon: '👥', label: 'SOCIAL' },
@@ -27,11 +28,12 @@ export default function App() {
   useEffect(() => { initAuth() }, [])
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#080c16' }}>
       <div className="text-center">
-        <div className="text-4xl mb-4 animate-float">🪢</div>
-        <div className="font-pixel text-sm" style={{ color: '#00fff5', textShadow: '0 0 20px #00fff5' }}>LASTLIMB</div>
-        <div className="font-mono text-xs text-gray-600 mt-2">LOADING...</div>
+        <div className="fn-heading text-5xl mb-3" style={{ color: 'white' }}>
+          LAST<span style={{ color: '#00a8ff' }}>LIMB</span>
+        </div>
+        <div style={{ color: 'rgba(192,200,216,0.4)', fontFamily: 'Barlow Condensed', letterSpacing: 3, fontSize: 12 }}>LOADING...</div>
       </div>
     </div>
   )
@@ -39,9 +41,9 @@ export default function App() {
   if (!user) return <AuthPage />
 
   const pages = {
+    lobby: <LobbyPage />,
     play: <PlayPage />,
     leaderboard: <LeaderboardPage />,
-    tournaments: <TournamentsPage />,
     store: <StorePage />,
     season: <SeasonPassPage />,
     friends: <FriendsPage />,
@@ -49,52 +51,48 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#0a0a0f' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#0a0e1a' }}>
       <Toaster position="top-right" toastOptions={{
-        style: { background: '#0f0f1a', color: '#fff', border: '1px solid rgba(0,255,245,0.2)', fontFamily: '"Share Tech Mono", monospace', fontSize: '12px' }
+        style: { background: '#161d2e', color: '#fff', border: '1px solid rgba(0,168,255,0.2)', fontFamily: 'Barlow, sans-serif', fontSize: '13px', borderRadius: '3px' }
       }} />
 
       {/* Top bar */}
-      <header className="border-b flex items-center justify-between px-4 py-2 sticky top-0 z-50"
-        style={{ borderColor: 'rgba(0,255,245,0.15)', background: '#0a0a0f' }}>
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🪢</span>
-          <span className="font-pixel text-sm" style={{ color: '#00fff5', fontSize: 11 }}>
-            LAST<span style={{ color: '#ff006e' }}>LIMB</span>
-          </span>
+      <header className="flex items-center justify-between px-5 py-3 sticky top-0 z-50"
+        style={{ background: 'rgba(8,12,22,0.95)', borderBottom: '1px solid rgba(192,200,216,0.08)', backdropFilter: 'blur(10px)' }}>
+        <div className="fn-heading text-2xl cursor-pointer" onClick={() => setActiveTab('lobby')}
+          style={{ color: 'white', fontSize: 22 }}>
+          LAST<span style={{ color: '#00a8ff' }}>LIMB</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {profile?.season_pass_active && new Date(profile.season_pass_expires_at) > new Date() && (
-            <div className="font-pixel text-xs px-2 py-1 border" style={{ color: '#ffbe0b', borderColor: '#ffbe0b', fontSize: 7 }}>
-              🎫 PASS ACTIVE
+            <div className="fn-badge" style={{ background: 'rgba(255,215,64,0.15)', color: '#ffd740', border: '1px solid rgba(255,215,64,0.3)' }}>
+              PASS ACTIVE
             </div>
           )}
-          <div className="flex items-center gap-1 arcade-card px-3 py-1">
-            <span className="text-sm">💎</span>
-            <span className="font-pixel text-xs" style={{ color: '#00e5ff', fontSize: 9 }}>{profile?.gems || 0}</span>
+          <div className="flex items-center gap-2 fn-card px-3 py-1.5" style={{ borderRadius: 3 }}>
+            <span style={{ fontSize: 14 }}>💎</span>
+            <span style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, color: '#00c8ff', fontSize: 15 }}>{profile?.gems || 0}</span>
           </div>
-          <div className="font-mono text-xs text-gray-400">{profile?.username}</div>
+          <div style={{ color: 'rgba(192,200,216,0.6)', fontFamily: 'Barlow Condensed', fontWeight: 600, fontSize: 13, letterSpacing: 1 }}>
+            {profile?.username}
+          </div>
         </div>
       </header>
 
       {/* Page */}
       <main className="flex-1 overflow-y-auto pb-20">
-        {pages[activeTab]}
+        {pages[activeTab] || pages.lobby}
       </main>
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t"
-        style={{ background: '#0a0a0f', borderColor: 'rgba(0,255,245,0.15)' }}>
-        <div className="flex">
+      <nav className="fixed bottom-0 left-0 right-0 z-50"
+        style={{ background: 'rgba(8,12,22,0.97)', borderTop: '1px solid rgba(192,200,216,0.08)', backdropFilter: 'blur(10px)' }}>
+        <div className="flex max-w-lg mx-auto">
           {NAV_ITEMS.map(item => (
             <button key={item.id} onClick={() => setActiveTab(item.id)}
-              className="flex-1 flex flex-col items-center py-2 px-1 transition-all"
-              style={{
-                color: activeTab === item.id ? '#00fff5' : 'rgba(255,255,255,0.3)',
-                borderTop: activeTab === item.id ? '2px solid #00fff5' : '2px solid transparent',
-              }}>
-              <span className="text-lg mb-0.5">{item.icon}</span>
-              <span className="font-pixel" style={{ fontSize: 6 }}>{item.label}</span>
+              className={`fn-nav-btn flex-1 ${activeTab === item.id ? 'active' : ''}`}>
+              <span style={{ fontSize: 18 }}>{item.icon}</span>
+              <span>{item.label}</span>
             </button>
           ))}
         </div>
