@@ -10,6 +10,7 @@ import SeasonPassPage from './pages/SeasonPassPage'
 import TournamentsPage from './pages/TournamentsPage'
 import FriendsPage from './pages/FriendsPage'
 import LobbyPage from './pages/LobbyPage'
+import LockerPage from './pages/LockerPage'
 import './styles/index.css'
 
 const NAV_ITEMS = [
@@ -42,6 +43,7 @@ export default function App() {
 
   const pages = {
     lobby: <LobbyPage />,
+    locker: <LockerPage />,
     play: <PlayPage />,
     leaderboard: <LeaderboardPage />,
     store: <StorePage />,
