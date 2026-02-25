@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export default function TournamentsPage() {
-  const { getApiHeaders, profile } = useStore()
+  const { getApiHeaders, user } = useStore()
   const [tournaments, setTournaments] = useState([])
   const [loading, setLoading] = useState(true)
   const [joining, setJoining] = useState(null)
@@ -17,106 +17,75 @@ export default function TournamentsPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  const joinTournament = async (tournament) => {
-    if ((profile?.gems || 0) < tournament.entry_fee) {
-      return toast.error(`Need ${tournament.entry_fee} gems to enter!`)
-    }
-    setJoining(tournament.id)
-    const headers = await getApiHeaders()
-    const res = await fetch(`${API}/api/tournaments/${tournament.id}/join`, { method: 'POST', headers })
-    const data = await res.json()
-    if (data.success) {
-      toast.success('Entered tournament!')
-      setTournaments(t => t.map(tt => tt.id === tournament.id
-        ? { ...tt, current_players: tt.current_players + 1 } : tt))
-    } else {
-      toast.error(data.error || 'Failed to join')
-    }
-    setJoining(null)
+  const join = async (id) => {
+    setJoining(id)
+    try {
+      const headers = await getApiHeaders()
+      const res = await fetch(`${API}/api/tournaments/${id}/join`, { method: 'POST', headers })
+      const data = await res.json()
+      if (data.success) { toast.success('Joined tournament!'); setTournaments(t => t.map(x => x.id === id ? { ...x, joined: true } : x)) }
+      else throw new Error(data.error)
+    } catch (e) { toast.error(e.message || 'Failed to join') }
+    finally { setJoining(null) }
   }
 
-  const formatDate = (d) => {
-    if (!d) return 'TBD'
-    return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  }
+  const statusColor = (s) => s === 'active' ? '#00e676' : s === 'upcoming' ? '#ffd740' : 'rgba(192,200,216,0.3)'
+  const statusLabel = (s) => s === 'active' ? 'LIVE' : s === 'upcoming' ? 'UPCOMING' : 'ENDED'
 
   return (
     <div className="min-h-screen p-4 max-w-3xl mx-auto">
-      <div className="text-center mb-8">
-        <div className="text-4xl mb-2">⚔️</div>
-        <h1 className="font-pixel text-xl" style={{ color: '#ff006e' }}>TOURNAMENTS</h1>
-        <p className="font-mono text-xs text-gray-500 mt-1">Compete for glory and gems</p>
+      <div className="mb-6">
+        <div className="fn-heading text-3xl text-white">EVENTS</div>
+        <div style={{ color: 'rgba(192,200,216,0.4)', fontFamily: 'Barlow', fontSize: 14, marginTop: 2 }}>Compete for exclusive rewards</div>
       </div>
 
       {loading ? (
-        <div className="text-center font-pixel text-xs text-gray-500">LOADING...</div>
+        <div className="text-center py-20" style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow Condensed', letterSpacing: 2 }}>LOADING...</div>
+      ) : tournaments.length === 0 ? (
+        <div className="fn-card p-12 text-center" style={{ borderRadius: 4 }}>
+          <div className="fn-heading text-2xl mb-2" style={{ color: 'rgba(192,200,216,0.2)' }}>NO EVENTS</div>
+          <div style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow', fontSize: 14 }}>Check back soon for upcoming tournaments!</div>
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {tournaments.map(t => (
-            <div key={t.id} className="arcade-card p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-pixel text-sm text-white">{t.name}</h3>
-                    <span className={`font-pixel px-2 py-0.5 text-xs ${
-                      t.status === 'open' ? 'text-green-400 border border-green-700' :
-                      t.status === 'active' ? 'text-yellow-400 border border-yellow-700' : 'text-gray-500'
-                    }`} style={{ fontSize: 7 }}>
-                      {t.status.toUpperCase()}
-                    </span>
+            <div key={t.id} className="fn-card p-5" style={{ borderRadius: 4, ...(t.status === 'active' ? { borderColor: '#00e676', boxShadow: '0 0 20px rgba(0,230,118,0.05)' } : {}) }}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="fn-heading text-xl text-white">{t.name}</div>
+                    <div className="fn-badge" style={{ color: statusColor(t.status), background: `${statusColor(t.status)}18`, border: `1px solid ${statusColor(t.status)}44` }}>
+                      {statusLabel(t.status)}
+                    </div>
                   </div>
-                  <div className="font-mono text-xs text-gray-400">Starts: {formatDate(t.starts_at)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-pixel text-xs" style={{ color: '#00e5ff', fontSize: 9 }}>
-                    💎 {t.prize_gems} PRIZE
+                  <div style={{ color: 'rgba(192,200,216,0.5)', fontFamily: 'Barlow', fontSize: 13, marginBottom: 12 }}>{t.description}</div>
+                  <div className="flex gap-4 flex-wrap">
+                    <div style={{ fontFamily: 'Barlow Condensed', fontSize: 13 }}>
+                      <span style={{ color: 'rgba(192,200,216,0.4)' }}>PLAYERS: </span>
+                      <span style={{ color: 'white', fontWeight: 700 }}>{t.participant_count || 0}</span>
+                    </div>
+                    {t.prize_pool && (
+                      <div style={{ fontFamily: 'Barlow Condensed', fontSize: 13 }}>
+                        <span style={{ color: 'rgba(192,200,216,0.4)' }}>PRIZE: </span>
+                        <span style={{ color: '#ffd740', fontWeight: 700 }}>💎 {t.prize_pool}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="font-mono text-xs text-gray-500 mt-1">Entry: {t.entry_fee} gems</div>
                 </div>
+                {t.status !== 'ended' && !t.joined && (
+                  <button onClick={() => join(t.id)} disabled={joining === t.id}
+                    className="fn-btn fn-btn-blue flex-shrink-0" style={{ fontSize: 13, padding: '10px 20px' }}>
+                    {joining === t.id ? '...' : 'JOIN'}
+                  </button>
+                )}
+                {t.joined && (
+                  <div className="fn-badge" style={{ color: '#00e676', background: 'rgba(0,230,118,0.1)', border: '1px solid rgba(0,230,118,0.3)', flexShrink: 0 }}>
+                    JOINED ✓
+                  </div>
+                )}
               </div>
-
-              {/* Player count */}
-              <div className="mb-4">
-                <div className="flex justify-between text-xs font-mono text-gray-500 mb-1">
-                  <span>Players</span>
-                  <span>{t.current_players}/{t.max_players}</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{
-                    width: `${(t.current_players / t.max_players) * 100}%`,
-                    background: 'linear-gradient(90deg, #ff006e, #8338ec)'
-                  }} />
-                </div>
-              </div>
-
-              {/* Player slots */}
-              <div className="flex gap-1 mb-4">
-                {Array.from({ length: t.max_players }).map((_, i) => (
-                  <div key={i} className={`flex-1 h-2 ${i < t.current_players ? 'bg-pink-600' : 'bg-gray-800'}`} />
-                ))}
-              </div>
-
-              {t.status === 'open' && (
-                <button onClick={() => joinTournament(t)} disabled={joining === t.id}
-                  className="btn-pixel btn-pink w-full" style={{ fontSize: 9 }}>
-                  {joining === t.id ? 'JOINING...' : `⚔️ JOIN TOURNAMENT · 💎 ${t.entry_fee}`}
-                </button>
-              )}
-              {t.status === 'active' && (
-                <div className="text-center font-pixel text-xs" style={{ color: '#ffbe0b', fontSize: 8 }}>
-                  🔴 TOURNAMENT IN PROGRESS
-                </div>
-              )}
             </div>
           ))}
-
-          {tournaments.length === 0 && (
-            <div className="text-center py-12 arcade-card p-8">
-              <div className="text-5xl mb-4">⚔️</div>
-              <div className="font-pixel text-xs text-gray-500 mb-2">NO ACTIVE TOURNAMENTS</div>
-              <div className="font-mono text-xs text-gray-700">Check back soon for new tournaments!</div>
-            </div>
-          )}
         </div>
       )}
     </div>
