@@ -1,144 +1,144 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useStore } from '../lib/store'
 import toast from 'react-hot-toast'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export default function FriendsPage() {
-  const { getApiHeaders, profile } = useStore()
+  const { getApiHeaders, user } = useStore()
   const [friends, setFriends] = useState([])
-  const [pendingRequests, setPendingRequests] = useState([])
+  const [requests, setRequests] = useState([])
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState('friends')
 
   const loadFriends = async () => {
-    const headers = await getApiHeaders()
-    const res = await fetch(`${API}/api/game/friends`, { headers })
-    const data = await res.json()
-    setFriends(data || [])
-    setLoading(false)
+    try {
+      const headers = await getApiHeaders()
+      const [fr, rq] = await Promise.all([
+        fetch(`${API}/api/social/friends`, { headers }).then(r => r.json()),
+        fetch(`${API}/api/social/requests`, { headers }).then(r => r.json()),
+      ])
+      setFriends(fr); setRequests(rq)
+    } catch {}
+    finally { setLoading(false) }
   }
 
   useEffect(() => { loadFriends() }, [])
 
-  const searchUsers = async (q) => {
-    if (q.length < 2) { setSearchResults([]); return }
-    const headers = await getApiHeaders()
-    const res = await fetch(`${API}/api/game/search?q=${encodeURIComponent(q)}`, { headers })
-    const data = await res.json()
-    setSearchResults(data)
+  const searchUsers = async () => {
+    if (!search.trim()) return
+    try {
+      const headers = await getApiHeaders()
+      const res = await fetch(`${API}/api/social/search?q=${encodeURIComponent(search)}`, { headers })
+      setSearchResults(await res.json())
+    } catch { toast.error('Search failed') }
   }
 
-  useEffect(() => {
-    const t = setTimeout(() => searchUsers(search), 400)
-    return () => clearTimeout(t)
-  }, [search])
-
-  const sendRequest = async (userId) => {
-    const headers = await getApiHeaders()
-    await fetch(`${API}/api/game/friends/request`, {
-      method: 'POST', headers,
-      body: JSON.stringify({ targetId: userId })
-    })
-    toast.success('Friend request sent!')
-    setSearchResults(r => r.filter(u => u.id !== userId))
+  const sendRequest = async (id) => {
+    try {
+      const headers = await getApiHeaders()
+      await fetch(`${API}/api/social/friend-request`, { method: 'POST', headers, body: JSON.stringify({ targetId: id }) })
+      toast.success('Friend request sent!')
+      setSearchResults(r => r.map(u => u.id === id ? { ...u, requestSent: true } : u))
+    } catch { toast.error('Failed to send request') }
   }
 
-  const acceptRequest = async (requesterId) => {
-    const headers = await getApiHeaders()
-    await fetch(`${API}/api/game/friends/accept`, {
-      method: 'POST', headers,
-      body: JSON.stringify({ requesterId })
-    })
-    toast.success('Friend added!')
-    loadFriends()
+  const respond = async (id, accept) => {
+    try {
+      const headers = await getApiHeaders()
+      await fetch(`${API}/api/social/respond`, { method: 'POST', headers, body: JSON.stringify({ requestId: id, accept }) })
+      toast.success(accept ? 'Friend added!' : 'Request declined')
+      await loadFriends()
+    } catch { toast.error('Failed') }
   }
 
-  const statusDot = (status) => (
-    <div className={`w-2 h-2 rounded-full ${
-      status === 'online' ? 'bg-green-400' :
-      status === 'in_game' ? 'bg-yellow-400' : 'bg-gray-600'
-    }`} title={status} />
-  )
+  const tabs = [
+    { id: 'friends', label: `FRIENDS ${friends.length > 0 ? `(${friends.length})` : ''}` },
+    { id: 'requests', label: `REQUESTS ${requests.length > 0 ? `(${requests.length})` : ''}` },
+    { id: 'search', label: 'ADD FRIENDS' },
+  ]
 
   return (
     <div className="min-h-screen p-4 max-w-2xl mx-auto">
-      <div className="text-center mb-8">
-        <div className="text-4xl mb-2">👥</div>
-        <h1 className="font-pixel text-xl" style={{ color: '#8338ec' }}>FRIENDS</h1>
+      <div className="fn-heading text-3xl text-white mb-5">SOCIAL</div>
+
+      <div className="flex border-b mb-5" style={{ borderColor: 'rgba(192,200,216,0.1)' }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`fn-tab ${tab === t.id ? 'active' : ''}`}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Search */}
-      <div className="arcade-card p-4 mb-6">
-        <div className="font-pixel text-xs text-gray-400 mb-3" style={{ fontSize: 8 }}>FIND PLAYERS</div>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search by username..."
-          className="w-full bg-black border text-white p-3 outline-none font-mono text-sm"
-          style={{ borderColor: 'rgba(131,56,236,0.4)' }} />
-        {searchResults.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {searchResults.filter(u => u.id !== profile?.id).map(u => (
-              <div key={u.id} className="flex items-center justify-between p-2 border border-gray-800">
-                <div className="flex items-center gap-2">
-                  {statusDot(u.status)}
-                  <span className="font-mono text-sm">{u.username}</span>
-                  <span className="font-pixel text-xs text-gray-600" style={{ fontSize: 7 }}>LVL {u.level}</span>
+      {tab === 'friends' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {loading ? <div className="text-center py-10" style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow Condensed', letterSpacing: 2 }}>LOADING...</div>
+          : friends.length === 0 ? (
+            <div className="fn-card p-10 text-center" style={{ borderRadius: 4 }}>
+              <div className="fn-heading text-xl mb-2" style={{ color: 'rgba(192,200,216,0.2)' }}>NO FRIENDS YET</div>
+              <div style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow', fontSize: 14 }}>Search for players to add them!</div>
+            </div>
+          ) : friends.map(f => (
+            <div key={f.id} className="fn-card flex items-center gap-3 px-4 py-3" style={{ borderRadius: 3 }}>
+              <div className="fn-card flex items-center justify-center" style={{ width: 40, height: 40, borderRadius: '50%', fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>
+                {f.username?.[0]?.toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 16, color: 'white' }}>{f.username}</div>
+                <div style={{ fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.4)', letterSpacing: 1 }}>LEVEL {f.level}</div>
+              </div>
+              <div style={{ fontFamily: 'Barlow Condensed', fontSize: 13, color: '#00e676' }}>W: {f.wins}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'requests' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {requests.length === 0 ? (
+            <div className="fn-card p-10 text-center" style={{ borderRadius: 4 }}>
+              <div style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow', fontSize: 14 }}>No pending requests</div>
+            </div>
+          ) : requests.map(r => (
+            <div key={r.id} className="fn-card flex items-center gap-3 px-4 py-3" style={{ borderRadius: 3 }}>
+              <div className="fn-card flex items-center justify-center" style={{ width: 40, height: 40, borderRadius: '50%', fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>
+                {r.username?.[0]?.toUpperCase()}
+              </div>
+              <div style={{ flex: 1, fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 16, color: 'white' }}>{r.username}</div>
+              <div className="flex gap-2">
+                <button onClick={() => respond(r.id, true)} className="fn-btn fn-btn-blue" style={{ fontSize: 12, padding: '8px 16px' }}>ACCEPT</button>
+                <button onClick={() => respond(r.id, false)} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>DECLINE</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'search' && (
+        <div>
+          <div className="flex gap-3 mb-5">
+            <input className="fn-input" placeholder="Search by username..." value={search}
+              onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchUsers()} />
+            <button onClick={searchUsers} className="fn-btn fn-btn-blue" style={{ fontSize: 13, padding: '10px 20px', flexShrink: 0 }}>SEARCH</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {searchResults.filter(r => r.id !== user?.id).map(r => (
+              <div key={r.id} className="fn-card flex items-center gap-3 px-4 py-3" style={{ borderRadius: 3 }}>
+                <div className="fn-card flex items-center justify-center" style={{ width: 40, height: 40, borderRadius: '50%', fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>
+                  {r.username?.[0]?.toUpperCase()}
                 </div>
-                <button onClick={() => sendRequest(u.id)} className="btn-pixel btn-purple" style={{ fontSize: 8, padding: '6px 10px', color: '#8338ec', borderColor: '#8338ec' }}>
-                  + ADD
+                <div style={{ flex: 1, fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 16, color: 'white' }}>{r.username}</div>
+                <button onClick={() => sendRequest(r.id)} disabled={r.requestSent}
+                  className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px', opacity: r.requestSent ? 0.5 : 1 }}>
+                  {r.requestSent ? 'SENT' : 'ADD'}
                 </button>
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* Friends list */}
-      <div className="arcade-card p-4">
-        <div className="font-pixel text-xs text-gray-400 mb-3" style={{ fontSize: 8 }}>
-          FRIENDS ({friends.length})
         </div>
-        {loading ? (
-          <div className="text-xs text-gray-600 font-mono">Loading...</div>
-        ) : friends.length === 0 ? (
-          <div className="text-center py-6">
-            <div className="text-3xl mb-2">🤝</div>
-            <div className="font-mono text-xs text-gray-600">No friends yet. Search for players above!</div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {friends.map(f => {
-              const friend = f.requester_id === profile?.id ? f.addressee : f.requester
-              return (
-                <div key={f.id} className="flex items-center justify-between p-3 border border-gray-800 hover:border-purple-800 transition-all">
-                  <div className="flex items-center gap-3">
-                    {statusDot(friend?.status)}
-                    <div>
-                      <div className="font-mono text-sm text-white">{friend?.username}</div>
-                      <div className="font-pixel text-xs mt-0.5" style={{
-                        color: friend?.status === 'online' ? '#06d6a0' :
-                               friend?.status === 'in_game' ? '#ffbe0b' : '#555',
-                        fontSize: 7
-                      }}>
-                        {friend?.status === 'in_game' ? '🎮 IN GAME' :
-                         friend?.status === 'online' ? '🟢 ONLINE' : '⬜ OFFLINE'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {friend?.status === 'online' && (
-                      <button className="btn-pixel" style={{ fontSize: 7, padding: '5px 8px', color: '#00fff5', borderColor: '#00fff5' }}>
-                        INVITE
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
