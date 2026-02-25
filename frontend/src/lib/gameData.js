@@ -1,8 +1,4 @@
-// ============================================
-// ALL UNLOCKABLE ITEMS - using custom cel-shaded art
-// ============================================
-
-const img = (filename) => `/assets/${filename}`;
+const img = (filename) => `https://raw.githubusercontent.com/ducefritts/lastlimb/main/frontend/public/assets/${filename}`
 
 export const FONT_STYLES = {
   font_neon:   { fontFamily: '"Share Tech Mono", monospace', color: '#00fff5', textShadow: '0 0 8px #00fff5' },
@@ -10,7 +6,7 @@ export const FONT_STYLES = {
   font_bubbly:  { fontFamily: '"Comic Sans MS", cursive', color: '#ff69b4', textShadow: 'none' },
   font_pixel:   { fontFamily: '"Press Start 2P", monospace', color: '#ffbe0b', textShadow: '0 0 6px #ffbe0b' },
   font_horror:  { fontFamily: 'Georgia, serif', color: '#ff2244', textShadow: '2px 2px 4px #000, 0 0 10px #ff0000' },
-};
+}
 
 export const ALL_UNLOCKABLES = [
   { id: 'color_blue',    name: 'Electric Blue',  type: 'color',     slot: 'color',     value: '#00aaff', image: img('color_blue.png'),    rarity: 'common',    gem_price: 150 },
@@ -46,7 +42,7 @@ export const ALL_UNLOCKABLES = [
   { id: 'font_horror', name: 'Horror',    type: 'font', slot: 'font', fontPreview: true, rarity: 'epic',   gem_price: 500 },
 
   { id: 'skin_legendary', name: 'Diamond Skin', type: 'skin', slot: 'skin', image: img('skin_legendary.png'), rarity: 'legendary', gem_price: 2000 },
-];
+]
 
 export const SEASON_PASS_TIERS = [
   { tier: 1,  free: { type: 'gems', amount: 50 },            paid: { type: 'item', id: 'hat_cap' } },
@@ -79,20 +75,20 @@ export const SEASON_PASS_TIERS = [
   { tier: 28, free: null, paid: { type: 'item', id: 'font_horror' } },
   { tier: 29, free: null, paid: { type: 'gems', amount: 500 } },
   { tier: 30, free: null, paid: { type: 'item', id: 'skin_legendary', bonus_gems: 500 } },
-];
+]
 
 export const GEM_PACKS = [
   { id: 'gems_100',  name: 'Starter Pack',  gems: 100,  price: '$0.99',  price_cents: 99,   bonus: null,         popular: false },
   { id: 'gems_500',  name: 'Explorer Pack', gems: 500,  price: '$3.99',  price_cents: 399,  bonus: '+50 bonus',  popular: false },
   { id: 'gems_1200', name: 'Champion Pack', gems: 1200, price: '$7.99',  price_cents: 799,  bonus: '+200 bonus', popular: true },
   { id: 'gems_2500', name: 'Legend Pack',   gems: 2500, price: '$14.99', price_cents: 1499, bonus: '+500 bonus', popular: false },
-];
+]
 
 export const RARITY_COLORS = {
   common:    '#aaaaaa',
   rare:      '#00aaff',
   epic:      '#8338ec',
   legendary: '#ffbe0b',
-};
+}
 
-export const getItemById = (id) => ALL_UNLOCKABLES.find(i => i.id === id);
+export const getItemById = (id) => ALL_UNLOCKABLES.find(i => i.id === id)
