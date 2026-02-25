@@ -1,111 +1,118 @@
 import React, { useState } from 'react'
 import { useStore } from '../lib/store'
-import { ALL_UNLOCKABLES, RARITY_COLORS, getItemById } from '../lib/gameData'
-import HangmanPixel from '../components/HangmanPixel'
+import { ALL_UNLOCKABLES, RARITY_COLORS, FONT_STYLES } from '../lib/gameData'
 import toast from 'react-hot-toast'
-import { supabase } from '../lib/supabase'
+import HangmanPixel from '../components/HangmanPixel'
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export default function ProfilePage() {
-  const { profile, unlockedItems, achievements, badges, equipItem } = useStore()
+  const { profile, user, unlockedItems, getApiHeaders, loadProfile, signOut } = useStore()
   const [tab, setTab] = useState('customize')
+  const [saving, setSaving] = useState(false)
 
-  const equip = async (slot, itemId) => {
-    await equipItem(slot, itemId)
-    toast.success('Equipped!')
+  const equippedHat       = profile?.equipped_hat       || 'none'
+  const equippedColor     = profile?.equipped_color     || 'white'
+  const equippedAccessory = profile?.equipped_accessory || 'none'
+  const equippedGallows   = profile?.equipped_gallows   || 'classic'
+
+  const equipItem = async (slot, id) => {
+    setSaving(true)
+    try {
+      const headers = await getApiHeaders()
+      await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId: id }) })
+      await loadProfile(user.id)
+      toast.success('Equipped!')
+    } catch { toast.error('Failed to equip') }
+    finally { setSaving(false) }
   }
 
-  const logout = async () => {
-    await supabase.auth.signOut()
-  }
+  const unlockedSet = new Set(unlockedItems)
+  const getSlotItems = (type) => ALL_UNLOCKABLES.filter(i => i.type === type && unlockedSet.has(i.id))
 
-  const levelProgress = profile ? (profile.xp % 500) / 500 : 0
-  const level = profile?.level || 1
+  const tabs = [
+    { id: 'customize', label: 'CUSTOMIZE' },
+    { id: 'stats',     label: 'STATS' },
+    { id: 'account',   label: 'ACCOUNT' },
+  ]
+
+  const stats = [
+    { label: 'Level',      value: profile?.level || 1, color: '#00a8ff' },
+    { label: 'XP',         value: (profile?.xp || 0).toLocaleString(), color: '#ce93d8' },
+    { label: 'Wins',       value: profile?.wins || 0, color: '#00e676' },
+    { label: 'Losses',     value: profile?.losses || 0, color: '#ff5252' },
+    { label: 'Win Rate',   value: `${profile?.win_rate || 0}%`, color: '#ffd740' },
+    { label: 'Win Streak', value: profile?.win_streak || 0, color: '#ff9800' },
+    { label: 'Gems',       value: (profile?.gems || 0).toLocaleString(), color: '#00c8ff' },
+    { label: 'Items',      value: unlockedItems.length, color: '#c0c8d8' },
+  ]
 
   return (
-    <div className="min-h-screen p-4 max-w-4xl mx-auto">
-      {/* Profile Header */}
-      <div className="arcade-card p-6 mb-6">
-        <div className="flex items-start gap-6">
-          {/* Hangman preview */}
-          <div className="w-32 flex-shrink-0">
-            <HangmanPixel
-              wrongGuesses={0}
-              equippedHat={profile?.equipped_hat}
-              equippedColor={profile?.equipped_color}
-              equippedAccessory={profile?.equipped_accessory}
-              equippedGallows={profile?.equipped_gallows}
-            />
+    <div className="min-h-screen p-4 max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="fn-card flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: '50%', fontSize: 24 }}>
+          {profile?.username?.[0]?.toUpperCase() || '?'}
+        </div>
+        <div>
+          <div className="fn-heading text-2xl text-white">{profile?.username}</div>
+          <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.15)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.3)' }}>
+            LEVEL {profile?.level || 1}
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <h2 className="font-pixel text-lg text-white">{profile?.username}</h2>
-              {badges.slice(0, 3).map(b => (
-                <span key={b.badge_id} title={b.badge?.name} className="text-lg">{b.badge?.icon}</span>
-              ))}
-            </div>
-            <div className="font-mono text-xs text-gray-400 mb-3">Level {level} · {profile?.xp || 0} XP</div>
-            <div className="progress-bar mb-2" style={{ width: '200px' }}>
-              <div className="progress-fill" style={{ width: `${levelProgress * 100}%` }} />
-            </div>
-            <div className="flex gap-6 mt-3">
-              <Stat label="WINS" value={profile?.wins || 0} color="#06d6a0" />
-              <Stat label="LOSSES" value={profile?.losses || 0} color="#ff4444" />
-              <Stat label="STREAK" value={profile?.best_streak || 0} color="#ffbe0b" />
-              <Stat label="GEMS" value={profile?.gems || 0} color="#00e5ff" prefix="💎" />
-            </div>
-          </div>
-          <button onClick={logout} className="btn-pixel btn-pink" style={{ fontSize: 8, padding: '8px 12px' }}>LOGOUT</button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto border-b border-gray-800 mb-6">
-        {[
-          { id: 'customize', label: '🎨 CUSTOMIZE' },
-          { id: 'achievements', label: '🏅 ACHIEVEMENTS' },
-          { id: 'badges', label: '🏷️ BADGES' },
-        ].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`tab-btn ${tab === t.id ? 'active' : ''}`}>{t.label}</button>
+      <div className="flex border-b mb-5" style={{ borderColor: 'rgba(192,200,216,0.1)' }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`fn-tab ${tab === t.id ? 'active' : ''}`}>
+            {t.label}
+          </button>
         ))}
       </div>
 
-      {/* Customize */}
       {tab === 'customize' && (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
+          {/* Preview */}
+          <div className="fn-card p-6 flex justify-center" style={{ borderRadius: 4, background: 'radial-gradient(ellipse at 50% 100%, rgba(0,168,255,0.06) 0%, transparent 60%)' }}>
+            <div style={{ width: 180 }}>
+              <HangmanPixel wrongGuesses={0} equippedHat={equippedHat} equippedColor={equippedColor}
+                equippedAccessory={equippedAccessory} equippedGallows={equippedGallows} />
+            </div>
+          </div>
+
+          {/* Slots */}
           {[
-            { slot: 'hat', label: 'HATS', type: 'hat' },
-            { slot: 'color', label: 'COLORS', type: 'color' },
-            { slot: 'accessory', label: 'ACCESSORIES', type: 'accessory' },
-            { slot: 'gallows', label: 'GALLOWS', type: 'gallows' },
-            { slot: 'font', label: 'FONTS', type: 'font' },
-          ].map(({ slot, label, type }) => {
-            const slotItems = ALL_UNLOCKABLES.filter(i => i.type === type && (unlockedItems.includes(i.id)))
-            const equipped = profile?.[`equipped_${slot}`]
-
+            { label: 'COLOR', type: 'color', slot: 'color', current: equippedColor },
+            { label: 'HAT', type: 'hat', slot: 'hat', current: equippedHat },
+            { label: 'ACCESSORY', type: 'accessory', slot: 'accessory', current: equippedAccessory },
+            { label: 'GALLOWS', type: 'gallows', slot: 'gallows', current: equippedGallows },
+          ].map(({ label, type, slot, current }) => {
+            const items = getSlotItems(type)
+            if (items.length === 0) return (
+              <div key={slot}>
+                <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.4)', letterSpacing: 1.5, marginBottom: 8 }}>{label}</div>
+                <div className="fn-card p-4 text-center" style={{ borderRadius: 3 }}>
+                  <div style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow', fontSize: 13 }}>No items unlocked — visit the Store!</div>
+                </div>
+              </div>
+            )
             return (
-              <div key={slot} className="arcade-card p-4">
-                <div className="font-pixel text-xs text-gray-400 mb-3" style={{ fontSize: 8 }}>{label}</div>
-                <div className="flex flex-wrap gap-2">
-                  {/* Default option */}
-                  <button onClick={() => equip(slot, 'none')}
-                    className={`tier-box ${equipped === 'none' || !equipped ? 'unlocked' : ''}`}>
-                    <span className="text-xs">∅</span>
-                    <span className="font-pixel mt-1" style={{ fontSize: 6 }}>NONE</span>
-                  </button>
-
-                  {slotItems.map(item => (
-                    <button key={item.id} onClick={() => equip(slot, item.id)}
-                      className={`tier-box ${equipped === item.id ? 'unlocked' : ''}`}
-                      title={item.name}
-                      style={equipped === item.id ? { borderColor: RARITY_COLORS[item.rarity] } : {}}>
-                      <span className="text-xl">{item.emoji}</span>
+              <div key={slot}>
+                <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.4)', letterSpacing: 1.5, marginBottom: 8 }}>{label}</div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {items.map(item => (
+                    <button key={item.id} onClick={() => equipItem(slot, item.id)} disabled={saving}
+                      className="fn-card flex flex-col items-center p-3 flex-shrink-0 transition-all"
+                      style={{ borderRadius: 3, width: 80, border: current === item.id ? '2px solid #00a8ff' : '1px solid rgba(192,200,216,0.12)',
+                        background: current === item.id ? 'rgba(0,168,255,0.1)' : '' }}>
+                      {item.image
+                        ? <img src={item.image} alt={item.name} style={{ width: 40, height: 40, objectFit: 'contain' }} />
+                        : <span style={{ fontSize: 32 }}>?</span>
+                      }
+                      <div style={{ fontFamily: 'Barlow Condensed', fontSize: 10, color: 'rgba(192,200,216,0.6)', marginTop: 4, textAlign: 'center', lineHeight: 1.2 }}>{item.name}</div>
                     </button>
                   ))}
-
-                  {slotItems.length === 0 && (
-                    <span className="font-mono text-xs text-gray-600">No items unlocked yet. Visit the Store!</span>
-                  )}
                 </div>
               </div>
             )
@@ -113,61 +120,29 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Achievements */}
-      {tab === 'achievements' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {achievements.map(a => (
-            <div key={a.achievement_id} className="arcade-card p-4 flex items-center gap-3"
-              style={{ borderColor: RARITY_COLORS[a.achievement?.rarity] + '66' }}>
-              <div className="text-3xl">{a.achievement?.icon}</div>
-              <div>
-                <div className="font-pixel text-xs text-white" style={{ fontSize: 9 }}>{a.achievement?.name}</div>
-                <div className="font-mono text-xs text-gray-400 mt-0.5">{a.achievement?.description}</div>
-                <div className="flex gap-2 mt-1">
-                  <span className="font-pixel text-xs" style={{ color: '#8338ec', fontSize: 7 }}>+{a.achievement?.xp_reward} XP</span>
-                  {a.achievement?.gem_reward > 0 && (
-                    <span className="font-pixel text-xs" style={{ color: '#00e5ff', fontSize: 7 }}>+{a.achievement.gem_reward} 💎</span>
-                  )}
-                </div>
-              </div>
+      {tab === 'stats' && (
+        <div className="grid grid-cols-2 gap-3">
+          {stats.map(s => (
+            <div key={s.label} className="fn-card p-4" style={{ borderRadius: 3 }}>
+              <div className="fn-heading text-2xl" style={{ color: s.color }}>{s.value}</div>
+              <div style={{ fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.4)', letterSpacing: 1, marginTop: 2 }}>{s.label.toUpperCase()}</div>
             </div>
           ))}
-          {achievements.length === 0 && (
-            <div className="col-span-2 text-center py-8">
-              <div className="text-4xl mb-2">🎯</div>
-              <div className="font-pixel text-xs text-gray-600">No achievements yet. Start playing!</div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Badges */}
-      {tab === 'badges' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {badges.map(b => (
-            <div key={b.badge_id} className="arcade-card p-4 text-center">
-              <div className="text-4xl mb-2">{b.badge?.icon}</div>
-              <div className="font-pixel text-xs text-white" style={{ fontSize: 8 }}>{b.badge?.name}</div>
-              <div className="font-mono text-xs text-gray-500 mt-1">{b.badge?.description}</div>
-            </div>
-          ))}
-          {badges.length === 0 && (
-            <div className="col-span-4 text-center py-8">
-              <div className="text-4xl mb-2">🏷️</div>
-              <div className="font-pixel text-xs text-gray-600">No badges yet. Keep playing!</div>
-            </div>
-          )}
+      {tab === 'account' && (
+        <div className="fn-card p-5" style={{ borderRadius: 4 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.4)', letterSpacing: 1, marginBottom: 4 }}>EMAIL</div>
+            <div style={{ fontFamily: 'Barlow', fontSize: 14, color: 'rgba(192,200,216,0.7)' }}>{user?.email}</div>
+          </div>
+          <div className="fn-divider" />
+          <button onClick={signOut} className="fn-btn fn-btn-outline" style={{ color: '#ff5252', borderColor: 'rgba(255,82,82,0.3)' }}>
+            SIGN OUT
+          </button>
         </div>
       )}
-    </div>
-  )
-}
-
-function Stat({ label, value, color, prefix = '' }) {
-  return (
-    <div>
-      <div className="font-pixel text-xs text-gray-600" style={{ fontSize: 7 }}>{label}</div>
-      <div className="font-pixel text-sm" style={{ color }}>{prefix}{value}</div>
     </div>
   )
 }
