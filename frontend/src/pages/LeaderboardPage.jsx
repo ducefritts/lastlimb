@@ -15,90 +15,66 @@ export default function LeaderboardPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  const rankColor = (rank) => {
-    if (rank === 1) return '#ffbe0b'
-    if (rank === 2) return '#aaaaaa'
-    if (rank === 3) return '#cd7f32'
-    return '#555'
-  }
-  const rankIcon = (rank) => {
-    if (rank === 1) return '🥇'
-    if (rank === 2) return '🥈'
-    if (rank === 3) return '🥉'
-    return `#${rank}`
+  const rankMedal = (rank) => {
+    if (rank === 1) return { icon: '🥇', color: '#ffd740' }
+    if (rank === 2) return { icon: '🥈', color: '#c0c8d8' }
+    if (rank === 3) return { icon: '🥉', color: '#cd7f32' }
+    return { icon: `#${rank}`, color: 'rgba(192,200,216,0.3)' }
   }
 
   return (
     <div className="min-h-screen p-4 max-w-3xl mx-auto">
-      <div className="text-center mb-8">
-        <div className="text-4xl mb-2">🏆</div>
-        <h1 className="font-pixel text-xl" style={{ color: '#ffbe0b' }}>LEADERBOARD</h1>
-        <p className="font-mono text-xs text-gray-500 mt-1">Top players ranked by XP</p>
+      <div className="mb-6">
+        <div className="fn-heading text-3xl text-white">LEADERBOARD</div>
+        <div style={{ color: 'rgba(192,200,216,0.4)', fontFamily: 'Barlow', fontSize: 14, marginTop: 2 }}>Top players ranked by XP</div>
       </div>
 
       {loading ? (
-        <div className="text-center font-pixel text-xs text-gray-500">LOADING...</div>
+        <div className="text-center py-20" style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow Condensed', letterSpacing: 2 }}>LOADING...</div>
       ) : (
-        <div className="space-y-2">
-          {/* Column headers */}
-          <div className="flex items-center gap-3 px-4 pb-2 border-b border-gray-800">
-            <div className="w-10 font-pixel text-xs text-gray-600" style={{ fontSize: 7 }}>RANK</div>
-            <div className="flex-1 font-pixel text-xs text-gray-600" style={{ fontSize: 7 }}>PLAYER</div>
-            <div className="w-16 text-right font-pixel text-xs text-gray-600" style={{ fontSize: 7 }}>WINS</div>
-            <div className="w-16 text-right font-pixel text-xs text-gray-600" style={{ fontSize: 7 }}>W/R %</div>
-            <div className="w-16 text-right font-pixel text-xs text-gray-600" style={{ fontSize: 7 }}>XP</div>
+        <div>
+          {/* Header row */}
+          <div className="flex items-center gap-3 px-4 pb-3 mb-2" style={{ borderBottom: '1px solid rgba(192,200,216,0.08)' }}>
+            <div style={{ width: 48, fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.3)', letterSpacing: 1 }}>RANK</div>
+            <div style={{ flex: 1, fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.3)', letterSpacing: 1 }}>PLAYER</div>
+            <div style={{ width: 56, textAlign: 'right', fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.3)', letterSpacing: 1 }}>WINS</div>
+            <div style={{ width: 56, textAlign: 'right', fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.3)', letterSpacing: 1 }}>W/R</div>
+            <div style={{ width: 64, textAlign: 'right', fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.3)', letterSpacing: 1 }}>XP</div>
           </div>
 
-          {leaderboard.map((player, i) => (
-            <div key={player.id} className={`arcade-card flex items-center gap-3 p-4 transition-all ${
-              player.id === user?.id ? 'border-cyan-600' : ''
-            }`} style={player.id === user?.id ? { boxShadow: '0 0 10px rgba(0,255,245,0.2)' } : {}}>
-              
-              {/* Rank */}
-              <div className="w-10 text-center">
-                {player.rank <= 3 ? (
-                  <span className="text-xl">{rankIcon(player.rank)}</span>
-                ) : (
-                  <span className="font-pixel text-xs" style={{ color: rankColor(player.rank), fontSize: 8 }}>
-                    #{player.rank}
-                  </span>
-                )}
-              </div>
-
-              {/* Player info */}
-              <div className="flex-1 flex items-center gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm text-white">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {leaderboard.map((player) => {
+              const medal = rankMedal(player.rank)
+              const isMe = player.id === user?.id
+              return (
+                <div key={player.id} className="fn-card flex items-center gap-3 px-4 py-3"
+                  style={{ borderRadius: 3, ...(isMe ? { borderColor: '#00a8ff', boxShadow: '0 0 12px rgba(0,168,255,0.1)' } : {}) }}>
+                  <div style={{ width: 48, textAlign: 'center' }}>
+                    {player.rank <= 3
+                      ? <span style={{ fontSize: 20 }}>{medal.icon}</span>
+                      : <span style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 14, color: medal.color }}>{medal.icon}</span>
+                    }
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 16, color: isMe ? '#00a8ff' : 'white' }}>
                       {player.username}
-                      {player.id === user?.id && <span className="text-xs text-gray-500 ml-2">(you)</span>}
-                    </span>
+                      {isMe && <span style={{ fontSize: 11, color: 'rgba(0,168,255,0.6)', marginLeft: 8, fontWeight: 400 }}>YOU</span>}
+                    </div>
+                    <div style={{ fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.3)', letterSpacing: 1 }}>LEVEL {player.level}</div>
                   </div>
-                  <div className="font-pixel text-xs text-gray-600 mt-0.5" style={{ fontSize: 7 }}>
-                    LVL {player.level}
-                  </div>
+                  <div style={{ width: 56, textAlign: 'right', fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 15, color: '#00e676' }}>{player.wins}</div>
+                  <div style={{ width: 56, textAlign: 'right', fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 15, color: '#ffd740' }}>{player.win_rate}%</div>
+                  <div style={{ width: 64, textAlign: 'right', fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 15, color: '#ce93d8' }}>{player.xp?.toLocaleString()}</div>
                 </div>
+              )
+            })}
+            {leaderboard.length === 0 && (
+              <div className="text-center py-20">
+                <div className="fn-heading text-xl mb-2" style={{ color: 'rgba(192,200,216,0.2)' }}>NO PLAYERS YET</div>
+                <div style={{ color: 'rgba(192,200,216,0.2)', fontFamily: 'Barlow', fontSize: 14 }}>Play some games to appear here!</div>
               </div>
-
-              {/* Stats */}
-              <div className="w-16 text-right">
-                <span className="font-pixel text-xs" style={{ color: '#06d6a0', fontSize: 9 }}>{player.wins}</span>
-              </div>
-              <div className="w-16 text-right">
-                <span className="font-pixel text-xs" style={{ color: '#ffbe0b', fontSize: 9 }}>{player.win_rate}%</span>
-              </div>
-              <div className="w-16 text-right">
-                <span className="font-pixel text-xs" style={{ color: '#8338ec', fontSize: 9 }}>{player.xp?.toLocaleString()}</span>
-              </div>
-            </div>
-          ))}
-
-          {leaderboard.length === 0 && (
-            <div className="text-center py-12">
-              <div className="font-pixel text-xs text-gray-600">NO PLAYERS YET</div>
-              <div className="font-mono text-xs text-gray-700 mt-2">Play some games to appear here!</div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
