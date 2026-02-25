@@ -116,7 +116,7 @@ export default function LobbyPage() {
         <button onClick={() => setActiveTab('play')} className="fn-btn fn-btn-blue flex-1" style={{ fontSize: 16 }}>
           PLAY NOW
         </button>
-        <button onClick={() => setActiveTab('profile')} className="fn-btn fn-btn-outline" style={{ padding: '12px 20px' }}>
+        <button onClick={() => setActiveTab('locker')} className="fn-btn fn-btn-outline" style={{ padding: '12px 20px' }}>
           CUSTOMIZE
         </button>
       </div>
