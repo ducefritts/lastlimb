@@ -1,5 +1,4 @@
 {
   "buildCommand": "vite build",
-  "outputDirectory": "dist",
-  "publicDirectory": "public"
+  "outputDirectory": "dist"
 }
