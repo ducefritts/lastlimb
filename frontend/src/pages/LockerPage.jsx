@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+// ── Free body options ──────────────────────────────────
 const SKIN_TONES = [
   { id: 'tan_1',    label: 'Light Tan',    color: '#f5e6d0' },
   { id: 'tan_2',    label: 'Medium Tan',   color: '#e8c99a' },
@@ -63,10 +64,10 @@ const PANTS_COLORS = [
 ]
 
 const STYLE_SLOTS = [
-  { key: 'color',     label: 'BODY FX',   type: 'color' },
-  { key: 'hat',       label: 'HAT',       type: 'hat' },
-  { key: 'accessory', label: 'ACCESSORY', type: 'accessory' },
-  { key: 'gallows',   label: 'GALLOWS',   type: 'gallows' },
+  { key: 'color',     label: 'BODY FX',    type: 'color' },
+  { key: 'hat',       label: 'HAT',        type: 'hat' },
+  { key: 'accessory', label: 'ACCESSORY',  type: 'accessory' },
+  { key: 'gallows',   label: 'GALLOWS',    type: 'gallows' },
 ]
 
 export default function LockerPage() {
@@ -75,6 +76,7 @@ export default function LockerPage() {
   const [activeSlot, setActiveSlot] = useState('skin')
   const [saving, setSaving] = useState(false)
   const [eyeColorInput, setEyeColorInput] = useState(profile?.eye_color || '#4a90d9')
+
   const [localChar, setLocalChar] = useState(null)
 
   const baseChar = {
@@ -96,6 +98,7 @@ export default function LockerPage() {
 
   const save = async (updates) => {
     setSaving(true)
+    // Map update keys to char keys
     const keyMap = { skin_tone: 'skinTone', eye_color: 'eyeColor', mouth_style: 'mouthStyle', hair_style: 'hairStyle', hair_color: 'hairColor', shirt_color: 'shirtColor', pants_color: 'pantsColor' }
     const charUpdates = {}
     for (const [k, v] of Object.entries(updates)) {
@@ -104,7 +107,10 @@ export default function LockerPage() {
     setLocalChar(prev => ({ ...(prev || getChar()), ...charUpdates }))
     try {
       const headers = await getApiHeaders()
-      fetch(`${API}/api/game/character`, { method: 'POST', headers, body: JSON.stringify(updates) })
+      fetch(`${API}/api/game/character`, {
+        method: 'POST', headers,
+        body: JSON.stringify(updates)
+      })
       toast.success('Saved!')
     } catch (e) { toast.error('Failed to save') }
     finally { setSaving(false) }
@@ -115,9 +121,18 @@ export default function LockerPage() {
     setLocalChar(prev => ({ ...(prev || getChar()), [slot]: itemId }))
     try {
       const headers = await getApiHeaders()
-      fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
-      toast.success('Equipped!')
-    } catch { toast.error('Failed') }
+      const res = await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Equipped!')
+      } else {
+        toast.error(data.error || 'Failed to equip')
+        console.error('Equip failed:', data)
+      }
+    } catch (e) { 
+      toast.error('Failed')
+      console.error('Equip error:', e)
+    }
     finally { setSaving(false) }
   }
 
@@ -147,6 +162,7 @@ export default function LockerPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(160deg, #080c16 0%, #0a101e 100%)' }}>
 
+      {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div className="fn-heading text-3xl text-white">LOCKER</div>
         <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>
@@ -154,16 +170,16 @@ export default function LockerPage() {
         </button>
       </div>
 
+      {/* Section toggle */}
       <div className="flex px-4 mb-4 gap-2">
         {['body', 'style'].map(s => (
           <button key={s} onClick={() => { setSection(s); setActiveSlot(s === 'body' ? 'skin' : 'shirt') }}
-            style={{
-              fontSize: 13, padding: '10px', flex: 1,
-              fontFamily: 'Barlow Condensed', fontWeight: 700, letterSpacing: 2,
-              borderRadius: 2, cursor: 'pointer', border: '1px solid',
-              borderColor: section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)',
+            className="fn-btn flex-1" style={{
+              fontSize: 13, padding: '10px',
               background: section === s ? 'rgba(0,168,255,0.2)' : 'transparent',
+              border: `1px solid ${section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)'}`,
               color: section === s ? '#00a8ff' : 'rgba(192,200,216,0.5)',
+              fontFamily: 'Barlow Condensed', fontWeight: 700, letterSpacing: 2,
             }}>
             {s === 'body' ? 'BODY' : 'STYLE'}
           </button>
@@ -172,6 +188,7 @@ export default function LockerPage() {
 
       <div className="flex flex-col md:flex-row flex-1 gap-4 px-4 pb-24">
 
+        {/* Character Preview */}
         <div className="fn-card flex flex-col items-center p-5 md:w-56 flex-shrink-0"
           style={{ borderRadius: 4, background: 'radial-gradient(ellipse at 50% 80%, rgba(0,168,255,0.07) 0%, transparent 65%)' }}>
           <HangmanPixel
@@ -195,7 +212,9 @@ export default function LockerPage() {
           </div>
         </div>
 
+        {/* Right panel */}
         <div className="flex-1 min-w-0">
+          {/* Slot tabs */}
           <div className="flex gap-1 mb-4 flex-wrap">
             {currentSlots.map(slot => (
               <button key={slot.key} onClick={() => setActiveSlot(slot.key)}
@@ -211,6 +230,7 @@ export default function LockerPage() {
             ))}
           </div>
 
+          {/* ── SKIN TONE ── */}
           {activeSlot === 'skin' && (
             <div className="grid grid-cols-3 gap-3">
               {SKIN_TONES.map(s => (
@@ -225,9 +245,12 @@ export default function LockerPage() {
             </div>
           )}
 
+          {/* ── EYE COLOR ── */}
           {activeSlot === 'eyes' && (
             <div className="fn-card p-5" style={{ borderRadius: 4 }}>
-              <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.5)', letterSpacing: 1, marginBottom: 16 }}>PICK EYE COLOR</div>
+              <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.5)', letterSpacing: 1, marginBottom: 16 }}>
+                PICK EYE COLOR
+              </div>
               <div className="flex items-center gap-4 mb-5">
                 <input type="color" value={eyeColorInput}
                   onChange={e => setEyeColorInput(e.target.value)}
@@ -237,6 +260,7 @@ export default function LockerPage() {
                   <div style={{ fontFamily: 'Barlow', fontSize: 13, color: 'rgba(192,200,216,0.4)', marginTop: 2 }}>Click the color wheel to pick any color</div>
                 </div>
               </div>
+              {/* Quick presets */}
               <div style={{ fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.4)', letterSpacing: 1, marginBottom: 10 }}>QUICK PRESETS</div>
               <div className="flex gap-2 flex-wrap mb-5">
                 {['#4a90d9','#2ecc40','#8B4513','#333333','#9B59B6','#e74c3c','#1abc9c','#ffd740'].map(c => (
@@ -244,10 +268,14 @@ export default function LockerPage() {
                     style={{ width: 32, height: 32, borderRadius: '50%', background: c, border: eyeColorInput === c ? '3px solid white' : '2px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} />
                 ))}
               </div>
-              <button onClick={() => save({ eye_color: eyeColorInput })} className="fn-btn fn-btn-blue" style={{ fontSize: 13 }}>APPLY</button>
+              <button onClick={() => save({ eye_color: eyeColorInput })}
+                className="fn-btn fn-btn-blue" style={{ fontSize: 13 }}>
+                APPLY
+              </button>
             </div>
           )}
 
+          {/* ── MOUTH ── */}
           {activeSlot === 'mouth' && (
             <div className="grid grid-cols-3 gap-3">
               {MOUTH_STYLES.map(m => (
@@ -262,6 +290,7 @@ export default function LockerPage() {
             </div>
           )}
 
+          {/* ── HAIR STYLE ── */}
           {activeSlot === 'hair' && (
             <div className="grid grid-cols-4 gap-3">
               {HAIR_STYLES.map(h => (
@@ -278,6 +307,7 @@ export default function LockerPage() {
             </div>
           )}
 
+          {/* ── HAIR COLOR ── */}
           {activeSlot === 'hair_color' && (
             <div className="grid grid-cols-2 gap-3">
               {HAIR_COLORS.map(h => (
@@ -292,6 +322,7 @@ export default function LockerPage() {
             </div>
           )}
 
+          {/* ── SHIRT ── */}
           {activeSlot === 'shirt' && (
             <div className="grid grid-cols-3 gap-3">
               {SHIRT_COLORS.map(c => (
@@ -306,6 +337,7 @@ export default function LockerPage() {
             </div>
           )}
 
+          {/* ── PANTS ── */}
           {activeSlot === 'pants' && (
             <div className="grid grid-cols-3 gap-3">
               {PANTS_COLORS.map(c => (
@@ -320,6 +352,7 @@ export default function LockerPage() {
             </div>
           )}
 
+          {/* ── STYLE SLOTS (color, hat, accessory, gallows) ── */}
           {['color','hat','accessory','gallows'].includes(activeSlot) && (() => {
             const items = slotItems(activeSlot === 'color' ? 'color' : activeSlot === 'hat' ? 'hat' : activeSlot === 'accessory' ? 'accessory' : 'gallows')
             const current = char[activeSlot]
