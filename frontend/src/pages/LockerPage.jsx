@@ -3,8 +3,7 @@ import { useStore } from '../lib/store'
 import { ALL_UNLOCKABLES, RARITY_COLORS } from '../lib/gameData'
 import HangmanPixel from '../components/HangmanPixel'
 import toast from 'react-hot-toast'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+import { supabase } from '../lib/supabase'
 
 const SKIN_TONES = [
   { id: 'tan_1',    label: 'Light Tan',    color: '#f5e6d0' },
@@ -70,7 +69,7 @@ const STYLE_SLOTS = [
 ]
 
 export default function LockerPage() {
-  const { profile, user, unlockedItems, getApiHeaders, loadProfile, setActiveTab } = useStore()
+  const { profile, user, unlockedItems, loadProfile, setActiveTab } = useStore()
   const [section, setSection] = useState('body')
   const [activeSlot, setActiveSlot] = useState('skin')
   const [saving, setSaving] = useState(false)
@@ -105,8 +104,7 @@ export default function LockerPage() {
   }
 
   const unequip = (slot) => {
-    const defaultVal = slot === 'color' ? 'white' : 'none'
-    equip(slot, defaultVal)
+    equip(slot, slot === 'color' ? 'white' : 'none')
   }
 
   const hasPending = Object.keys(pending).length > 0
@@ -114,37 +112,32 @@ export default function LockerPage() {
   const saveAll = async () => {
     setSaving(true)
     try {
-      const headers = await getApiHeaders()
-
-      const charUpdates = {}
-      const equipUpdates = []
+      const updates = {}
       for (const [k, v] of Object.entries(pending)) {
         if (k.startsWith('equip_')) {
-          equipUpdates.push({ slot: k.replace('equip_', ''), itemId: v })
+          updates[`equipped_${k.replace('equip_', '')}`] = v
         } else {
-          charUpdates[k] = v
+          updates[k] = v
         }
       }
 
-      if (Object.keys(charUpdates).length > 0) {
-        const res = await fetch(`${API}/api/game/character`, { method: 'POST', headers, body: JSON.stringify(charUpdates) })
-        const data = await res.json()
-        if (!data.success) throw new Error(data.error || 'Character save failed')
-      }
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
 
-      for (const { slot, itemId } of equipUpdates) {
-        await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
-      }
+      if (error) throw new Error(error.message)
 
       await loadProfile(user.id)
       setPending({})
       setLocalChar(null)
-      toast.success('All changes saved!')
+      toast.success('Saved!')
     } catch (e) {
       toast.error(e.message || 'Failed to save')
       console.error('Save error:', e)
+    } finally {
+      setSaving(false)
     }
-    finally { setSaving(false) }
   }
 
   const slotItems = (type) => ALL_UNLOCKABLES.filter(i => i.type === type && unlockedItems.includes(i.id))
@@ -353,7 +346,7 @@ export default function LockerPage() {
           )}
 
           {['color','hat','accessory','gallows'].includes(activeSlot) && (() => {
-            const items = slotItems(activeSlot === 'color' ? 'color' : activeSlot === 'hat' ? 'hat' : activeSlot === 'accessory' ? 'accessory' : 'gallows')
+            const items = slotItems(activeSlot)
             const current = char[activeSlot]
             return (
               <div>
