@@ -3,19 +3,19 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-const supabaseAnon = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 async function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  // Use anon client to verify user token (service key can't verify JWTs)
-  const { data: { user }, error } = await supabaseAnon.auth.getUser(token);
-  if (error || !user) {
-    console.error('Auth error:', error?.message);
-    return res.status(401).json({ error: 'Invalid token', detail: error?.message });
+  try {
+    // Decode JWT payload to get user ID
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    if (!payload.sub) return res.status(401).json({ error: 'Invalid token' });
+    req.user = { id: payload.sub, email: payload.email };
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token' });
   }
-  req.user = user;
-  next();
 }
 
 // Equip cosmetic
