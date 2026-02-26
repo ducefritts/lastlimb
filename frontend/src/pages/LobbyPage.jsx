@@ -78,6 +78,13 @@ export default function LobbyPage() {
             equippedColor={equippedColor}
             equippedAccessory={equippedAccessory}
             equippedGallows={equippedGallows}
+            skinTone={profile?.skin_tone || 'tan_2'}
+            eyeColor={profile?.eye_color || '#4a90d9'}
+            mouthStyle={profile?.mouth_style || 'happy'}
+            hairStyle={profile?.hair_style || 'short'}
+            hairColor={profile?.hair_color || 'brown'}
+            shirtColor={profile?.shirt_color || 'blue'}
+            pantsColor={profile?.pants_color || 'navy'}
           />
         </div>
 
