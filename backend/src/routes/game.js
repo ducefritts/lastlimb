@@ -3,24 +3,28 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabaseAnon = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 async function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return res.status(401).json({ error: 'Invalid token' });
+  // Use anon client to verify user token (service key can't verify JWTs)
+  const { data: { user }, error } = await supabaseAnon.auth.getUser(token);
+  if (error || !user) {
+    console.error('Auth error:', error?.message);
+    return res.status(401).json({ error: 'Invalid token', detail: error?.message });
+  }
   req.user = user;
   next();
 }
 
 // Equip cosmetic
 router.post('/equip', authMiddleware, async (req, res) => {
-  const { slot, itemId } = req.body; // slot: hat, color, accessory, font, gallows
+  const { slot, itemId } = req.body;
   
   const validSlots = ['equipped_hat', 'equipped_color', 'equipped_accessory', 'equipped_font', 'equipped_gallows', 'equipped_skin', 'equipped_eyes', 'equipped_mouth', 'equipped_hair', 'equipped_hair_color', 'equipped_shirt', 'equipped_pants'];
   if (!validSlots.includes(`equipped_${slot}`)) return res.status(400).json({ error: 'Invalid slot' });
 
-  // Verify owned (except defaults)
   if (itemId !== 'none' && itemId !== 'default' && itemId !== 'white' && itemId !== 'pixel' && itemId !== 'classic') {
     const { data: owned } = await supabase.from('unlocked_items')
       .select('id').eq('user_id', req.user.id).eq('item_id', itemId).single();
@@ -29,7 +33,6 @@ router.post('/equip', authMiddleware, async (req, res) => {
 
   await supabase.from('profiles').update({ [`equipped_${slot}`]: itemId }).eq('id', req.user.id);
   
-  // Grant customize achievement
   await supabase.from('user_achievements').upsert({
     user_id: req.user.id, achievement_id: 'customize_first'
   }, { onConflict: 'user_id,achievement_id' });
@@ -37,7 +40,7 @@ router.post('/equip', authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-// Season pass tier advance (called when user levels up or makes purchase)
+// Season pass tier advance
 router.post('/season-pass/advance', authMiddleware, async (req, res) => {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', req.user.id).single();
   
@@ -47,7 +50,6 @@ router.post('/season-pass/advance', authMiddleware, async (req, res) => {
   const newTier = profile.season_pass_tier + 1;
   await supabase.from('profiles').update({ season_pass_tier: newTier }).eq('id', req.user.id);
 
-  // Grant free tier reward
   const freeRewards = getSeasonPassFreeReward(newTier);
   if (freeRewards) {
     if (freeRewards.item_id) {
@@ -111,7 +113,6 @@ router.post('/friends/accept', authMiddleware, async (req, res) => {
   await supabase.from('friendships').update({ status: 'accepted' })
     .eq('requester_id', requesterId).eq('addressee_id', req.user.id);
 
-  // Check friend achievements
   const { count } = await supabase.from('friendships')
     .select('id', { count: 'exact' }).or(`requester_id.eq.${req.user.id},addressee_id.eq.${req.user.id}`).eq('status', 'accepted');
   
@@ -149,7 +150,6 @@ function getSeasonPassFreeReward(tier) {
     14: { item_id: 'accessory_scarf' },
     15: { gems: 200 },
     16: { item_id: 'color_gold' },
-    // Tiers 17-30 = paid season pass only (handled by client check)
     17: { item_id: 'hat_wizard' },
     18: { gems: 250 },
     19: { item_id: 'color_rainbow' },
@@ -167,7 +167,6 @@ function getSeasonPassFreeReward(tier) {
   };
   return freeRewards[tier] || null;
 }
-
 
 // Update character appearance
 router.post('/character', authMiddleware, async (req, res) => {
