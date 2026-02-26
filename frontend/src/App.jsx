@@ -16,8 +16,6 @@ import './styles/index.css'
 
 const NAV_ITEMS = [
   { id: 'lobby',       icon: '🏠', label: 'LOBBY' },
-  { id: 'play',        icon: '⚔️', label: 'PLAY' },
-  { id: 'practice',    icon: '🎯', label: 'PRACTICE' },
   { id: 'leaderboard', icon: '🏆', label: 'RANKS' },
   { id: 'store',       icon: '🛒', label: 'STORE' },
   { id: 'season',      icon: '🎫', label: 'PASS' },
@@ -44,15 +42,15 @@ export default function App() {
   if (!user) return <AuthPage />
 
   const pages = {
-    lobby: <LobbyPage />,
-    locker: <LockerPage />,
-    practice: <PracticePage />,
-    play: <PlayPage />,
+    lobby:       <LobbyPage />,
+    locker:      <LockerPage />,
+    practice:    <PracticePage />,
+    play:        <PlayPage />,
     leaderboard: <LeaderboardPage />,
-    store: <StorePage />,
-    season: <SeasonPassPage />,
-    friends: <FriendsPage />,
-    profile: <ProfilePage />,
+    store:       <StorePage />,
+    season:      <SeasonPassPage />,
+    friends:     <FriendsPage />,
+    profile:     <ProfilePage />,
   }
 
   return (
