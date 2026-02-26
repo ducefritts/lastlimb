@@ -68,7 +68,12 @@ export const useStore = create((set, get) => ({
   hasItem: (itemId) => get().unlockedItems.includes(itemId),
 
   getApiHeaders: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
+    let { data: { session } } = await supabase.auth.getSession()
+    // If token is expired or close to expiring, refresh it
+    if (!session?.access_token || (session.expires_at && session.expires_at * 1000 < Date.now() + 60000)) {
+      const { data: refreshed } = await supabase.auth.refreshSession()
+      if (refreshed?.session) session = refreshed.session
+    }
     return { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   },
 
