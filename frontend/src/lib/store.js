@@ -15,7 +15,7 @@ export const useStore = create((set, get) => ({
   // Game
   socket: null,
   currentGame: null,
-  matchmakingStatus: 'idle', // idle, searching, found
+  matchmakingStatus: 'idle',
 
   // UI
   activeTab: 'lobby',
@@ -28,19 +28,21 @@ export const useStore = create((set, get) => ({
   setMatchmakingStatus: (s) => set({ matchmakingStatus: s }),
 
   loadProfile: async (userId) => {
-    const token = (await supabase.auth.getSession()).data.session?.access_token
-    if (!token) return
-
     try {
-      const res = await fetch(`${API}/api/game/profile/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await res.json()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      const { data: unlockedItems } = await supabase
+        .from('unlocked_items')
+        .select('*')
+        .eq('user_id', userId)
+
       set({
-        profile: data.profile,
-        unlockedItems: data.unlockedItems?.map(i => i.item_id) || [],
-        achievements: data.achievements || [],
-        badges: data.badges || [],
+        profile,
+        unlockedItems: unlockedItems?.map(i => i.item_id) || [],
       })
     } catch (e) {
       console.error('Failed to load profile', e)
@@ -68,12 +70,7 @@ export const useStore = create((set, get) => ({
   hasItem: (itemId) => get().unlockedItems.includes(itemId),
 
   getApiHeaders: async () => {
-    let { data: { session } } = await supabase.auth.getSession()
-    // If token is expired or close to expiring, refresh it
-    if (!session?.access_token || (session.expires_at && session.expires_at * 1000 < Date.now() + 60000)) {
-      const { data: refreshed } = await supabase.auth.refreshSession()
-      if (refreshed?.session) session = refreshed.session
-    }
+    const { data: { session } } = await supabase.auth.getSession()
     return { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
   },
 
