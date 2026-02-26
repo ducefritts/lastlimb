@@ -11,11 +11,13 @@ import TournamentsPage from './pages/TournamentsPage'
 import FriendsPage from './pages/FriendsPage'
 import LobbyPage from './pages/LobbyPage'
 import LockerPage from './pages/LockerPage'
+import PracticePage from './pages/PracticePage'
 import './styles/index.css'
 
 const NAV_ITEMS = [
   { id: 'lobby',       icon: '🏠', label: 'LOBBY' },
   { id: 'play',        icon: '⚔️', label: 'PLAY' },
+  { id: 'practice',    icon: '🎯', label: 'PRACTICE' },
   { id: 'leaderboard', icon: '🏆', label: 'RANKS' },
   { id: 'store',       icon: '🛒', label: 'STORE' },
   { id: 'season',      icon: '🎫', label: 'PASS' },
@@ -44,6 +46,7 @@ export default function App() {
   const pages = {
     lobby: <LobbyPage />,
     locker: <LockerPage />,
+    practice: <PracticePage />,
     play: <PlayPage />,
     leaderboard: <LeaderboardPage />,
     store: <StorePage />,
@@ -58,7 +61,6 @@ export default function App() {
         style: { background: '#161d2e', color: '#fff', border: '1px solid rgba(0,168,255,0.2)', fontFamily: 'Barlow, sans-serif', fontSize: '13px', borderRadius: '3px' }
       }} />
 
-      {/* Top bar */}
       <header className="flex items-center justify-between px-5 py-3 sticky top-0 z-50"
         style={{ background: 'rgba(8,12,22,0.95)', borderBottom: '1px solid rgba(192,200,216,0.08)', backdropFilter: 'blur(10px)' }}>
         <div className="fn-heading text-2xl cursor-pointer" onClick={() => setActiveTab('lobby')}
@@ -81,12 +83,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Page */}
       <main className="flex-1 overflow-y-auto pb-20">
         {pages[activeTab] || pages.lobby}
       </main>
 
-      {/* Bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50"
         style={{ background: 'rgba(8,12,22,0.97)', borderTop: '1px solid rgba(192,200,216,0.08)', backdropFilter: 'blur(10px)' }}>
         <div className="flex max-w-lg mx-auto">
