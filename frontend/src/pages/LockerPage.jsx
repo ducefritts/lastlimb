@@ -88,6 +88,7 @@ export default function LockerPage() {
   const [saving, setSaving] = useState(false)
   const [eyeColorInput, setEyeColorInput] = useState(profile?.eye_color || '#4a90d9')
   const [localChar, setLocalChar] = useState(null)
+  const [pending, setPending] = useState({})
 
   const baseChar = {
     skinTone:   profile?.skin_tone          || 'tan_2',
@@ -104,48 +105,60 @@ export default function LockerPage() {
     font:       profile?.equipped_font      || 'none',
   }
 
-  const char = localChar ? { ...baseChar, ...localChar } : baseChar
+  const char = { ...baseChar, ...localChar }
 
-  const save = async (updates) => {
-    setSaving(true)
-    const keyMap = {
-      skin_tone: 'skinTone', eye_color: 'eyeColor', mouth_style: 'mouthStyle',
-      hair_style: 'hairStyle', hair_color: 'hairColor', shirt_color: 'shirtColor', pants_color: 'pantsColor'
-    }
-    const charUpdates = {}
-    for (const [k, v] of Object.entries(updates)) {
-      if (keyMap[k]) charUpdates[keyMap[k]] = v
-    }
-    setLocalChar(prev => ({ ...(prev || char), ...charUpdates }))
-    try {
-      const headers = await getApiHeaders()
-      await fetch(`${API}/api/game/character`, { method: 'POST', headers, body: JSON.stringify(updates) })
-      toast.success('Saved!')
-    } catch { toast.error('Failed to save') }
-    finally { setSaving(false) }
-  }
-
-  const equip = async (slot, itemId) => {
-    setSaving(true)
-    setLocalChar(prev => ({ ...(prev || char), [slot]: itemId }))
-    try {
-      const headers = await getApiHeaders()
-      const res = await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
-      const data = await res.json()
-      if (data.success) toast.success('Equipped!')
-      else toast.error(data.error || 'Failed to equip')
-    } catch { toast.error('Failed') }
-    finally { setSaving(false) }
-  }
-
+  // Just updates local preview — nothing saved yet
   const select = (charKey, charVal, dbKey, dbVal) => {
-    setLocalChar(prev => ({ ...(prev || char), [charKey]: charVal }))
-    save({ [dbKey]: dbVal })
+    setLocalChar(prev => ({ ...(prev || {}), [charKey]: charVal }))
+    setPending(prev => ({ ...prev, [dbKey]: dbVal }))
   }
 
-  const unequip = async (slot) => {
+  const equip = (slot, itemId) => {
+    setLocalChar(prev => ({ ...(prev || {}), [slot]: itemId }))
+    setPending(prev => ({ ...prev, [`equip_${slot}`]: itemId }))
+  }
+
+  const unequip = (slot) => {
     const defaultVal = slot === 'color' ? 'white' : slot === 'gallows' ? 'classic' : 'none'
-    await equip(slot, defaultVal)
+    equip(slot, defaultVal)
+  }
+
+  const hasPending = Object.keys(pending).length > 0
+
+  const saveAll = async () => {
+    setSaving(true)
+    try {
+      const headers = await getApiHeaders()
+
+      const charUpdates = {}
+      const equipUpdates = []
+      for (const [k, v] of Object.entries(pending)) {
+        if (k.startsWith('equip_')) {
+          equipUpdates.push({ slot: k.replace('equip_', ''), itemId: v })
+        } else {
+          charUpdates[k] = v
+        }
+      }
+
+      if (Object.keys(charUpdates).length > 0) {
+        const res = await fetch(`${API}/api/game/character`, { method: 'POST', headers, body: JSON.stringify(charUpdates) })
+        const data = await res.json()
+        if (!data.success) throw new Error(data.error || 'Character save failed')
+      }
+
+      for (const { slot, itemId } of equipUpdates) {
+        await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
+      }
+
+      await loadProfile(user.id)
+      setPending({})
+      setLocalChar(null)
+      toast.success('All changes saved!')
+    } catch (e) {
+      toast.error(e.message || 'Failed to save')
+      console.error('Save error:', e)
+    }
+    finally { setSaving(false) }
   }
 
   const slotItems = (type) => ALL_UNLOCKABLES.filter(i => i.type === type && unlockedItems.includes(i.id))
@@ -165,9 +178,17 @@ export default function LockerPage() {
 
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div className="fn-heading text-3xl text-white">LOCKER</div>
-        <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>
-          GET MORE ITEMS
-        </button>
+        <div className="flex gap-2">
+          {hasPending && (
+            <button onClick={saveAll} disabled={saving}
+              className="fn-btn fn-btn-blue" style={{ fontSize: 13, padding: '8px 20px' }}>
+              {saving ? 'SAVING...' : 'SAVE CHANGES'}
+            </button>
+          )}
+          <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>
+            GET MORE ITEMS
+          </button>
+        </div>
       </div>
 
       <div className="flex px-4 mb-4 gap-2">
@@ -236,7 +257,7 @@ export default function LockerPage() {
                   style={{ borderRadius: 3, border: `2px solid ${char.skinTone === s.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.skinTone === s.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', background: s.color, border: '2px solid rgba(0,0,0,0.3)', marginBottom: 6 }} />
                   <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 11, color: 'rgba(192,200,216,0.7)', textAlign: 'center' }}>{s.label}</div>
-                  {char.skinTone === s.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>ON</div>}
+                  {char.skinTone === s.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>SELECTED</div>}
                 </button>
               ))}
             </div>
@@ -272,7 +293,7 @@ export default function LockerPage() {
                   style={{ borderRadius: 3, border: `2px solid ${char.mouthStyle === m.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.mouthStyle === m.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>{m.preview}</div>
                   <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 12, color: 'rgba(192,200,216,0.7)' }}>{m.label}</div>
-                  {char.mouthStyle === m.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>ON</div>}
+                  {char.mouthStyle === m.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>SELECTED</div>}
                 </button>
               ))}
             </div>
@@ -356,7 +377,6 @@ export default function LockerPage() {
                       style={{ borderRadius: 3, border: `2px solid ${isDefault ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: isDefault ? 'rgba(0,168,255,0.1)' : '' }}>
                       <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>✕</div>
                       <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 10, color: 'rgba(192,200,216,0.5)', marginTop: 4 }}>NONE</div>
-                      {isDefault && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>ON</div>}
                     </button>
                     {items.map(item => {
                       const isEquipped = current === item.id
