@@ -17,7 +17,7 @@ async function authMiddleware(req, res, next) {
 router.post('/equip', authMiddleware, async (req, res) => {
   const { slot, itemId } = req.body; // slot: hat, color, accessory, font, gallows
   
-  const validSlots = ['equipped_hat', 'equipped_color', 'equipped_accessory', 'equipped_font', 'equipped_gallows'];
+  const validSlots = ['equipped_hat', 'equipped_color', 'equipped_accessory', 'equipped_font', 'equipped_gallows', 'equipped_skin', 'equipped_eyes', 'equipped_mouth', 'equipped_hair', 'equipped_hair_color', 'equipped_shirt', 'equipped_pants'];
   if (!validSlots.includes(`equipped_${slot}`)) return res.status(400).json({ error: 'Invalid slot' });
 
   // Verify owned (except defaults)
@@ -167,5 +167,18 @@ function getSeasonPassFreeReward(tier) {
   };
   return freeRewards[tier] || null;
 }
+
+
+// Update character appearance
+router.post('/character', authMiddleware, async (req, res) => {
+  const allowed = ['skin_tone', 'eye_color', 'mouth_style', 'hair_style', 'hair_color', 'shirt_color', 'pants_color'];
+  const updates = {};
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) updates[key] = req.body[key];
+  }
+  if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields' });
+  await supabase.from('profiles').update(updates).eq('id', req.user.id);
+  res.json({ success: true });
+});
 
 module.exports = router;
