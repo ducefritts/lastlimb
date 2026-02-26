@@ -1,10 +1,11 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useStore } from '../lib/store'
 import HangmanPixel from '../components/HangmanPixel'
 import { getItemById } from '../lib/gameData'
 
 export default function LobbyPage() {
   const { profile, setActiveTab, user, loadProfile } = useStore()
+  const [showPlayMenu, setShowPlayMenu] = useState(false)
 
   React.useEffect(() => {
     if (user?.id) loadProfile(user.id)
@@ -30,25 +31,85 @@ export default function LobbyPage() {
     { label: 'GEMS',   value: profile?.gems    || 0 },
   ]
 
+  const playModes = [
+    {
+      id: 'practice',
+      icon: '🎯',
+      label: 'PRACTICE',
+      desc: 'Solo mode vs the computer',
+      color: '#00e676',
+      tab: 'practice',
+    },
+    {
+      id: 'online',
+      icon: '⚔️',
+      label: 'ONLINE MATCH',
+      desc: 'Find a random opponent',
+      color: '#00a8ff',
+      tab: 'play',
+    },
+    {
+      id: 'friends',
+      icon: '👥',
+      label: 'PLAY WITH FRIENDS',
+      desc: 'Create or join a private room',
+      color: '#ff9800',
+      tab: 'play',
+    },
+  ]
+
   return (
     <div className="lobby-bg min-h-screen flex flex-col">
+
+      {/* Play Mode Modal */}
+      {showPlayMenu && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowPlayMenu(false)}
+        >
+          <div
+            className="w-full max-w-lg p-4 pb-8"
+            style={{ background: 'linear-gradient(180deg, #0d1426 0%, #080c16 100%)', borderTop: '1px solid rgba(192,200,216,0.1)', borderRadius: '16px 16px 0 0' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="fn-heading text-2xl text-white">SELECT MODE</div>
+              <button onClick={() => setShowPlayMenu(false)}
+                style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.4)', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: 1 }}>
+                ✕ CLOSE
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {playModes.map(mode => (
+                <button key={mode.id}
+                  onClick={() => { setShowPlayMenu(false); setActiveTab(mode.tab) }}
+                  className="fn-card flex items-center gap-4 p-4 transition-all text-left"
+                  style={{ borderRadius: 4, border: `1px solid ${mode.color}22`, background: `${mode.color}08` }}>
+                  <div style={{ fontSize: 32, width: 44, textAlign: 'center', flexShrink: 0 }}>{mode.icon}</div>
+                  <div style={{ flex: 1 }}>
+                    <div className="fn-heading text-lg" style={{ color: mode.color }}>{mode.label}</div>
+                    <div style={{ fontFamily: 'Barlow', fontSize: 13, color: 'rgba(192,200,216,0.4)', marginTop: 2 }}>{mode.desc}</div>
+                  </div>
+                  <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: `${mode.color}66` }}>▶</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero section */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 pt-8 pb-4 relative">
 
-        {/* Background glow behind character */}
         <div style={{
-          position: 'absolute',
-          bottom: '10%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 300,
-          height: 300,
+          position: 'absolute', bottom: '10%', left: '50%', transform: 'translateX(-50%)',
+          width: 300, height: 300,
           background: 'radial-gradient(circle, rgba(0,168,255,0.08) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
-        {/* Player name + level */}
         <div className="text-center mb-6">
           <div className="fn-heading text-3xl text-white mb-1">{profile?.username || 'PLAYER'}</div>
           <div className="flex items-center gap-2 justify-center">
@@ -63,7 +124,6 @@ export default function LobbyPage() {
           </div>
         </div>
 
-        {/* XP Bar */}
         <div className="w-full max-w-xs mb-8">
           <div className="flex justify-between mb-1" style={{ fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.5)', letterSpacing: 1 }}>
             <span>XP</span>
@@ -74,7 +134,6 @@ export default function LobbyPage() {
           </div>
         </div>
 
-        {/* Hangman Character - BIG showcase */}
         <div className="relative" style={{ width: 220, height: 240 }}>
           <HangmanPixel
             wrongGuesses={0}
@@ -92,7 +151,6 @@ export default function LobbyPage() {
           />
         </div>
 
-        {/* Equipped items display */}
         <div className="flex gap-3 mt-6 justify-center flex-wrap">
           {[
             { item: colorItem,     label: 'COLOR' },
@@ -124,7 +182,7 @@ export default function LobbyPage() {
 
       {/* Action buttons */}
       <div className="flex gap-3 px-4 mb-6">
-        <button onClick={() => setActiveTab('play')} className="fn-btn fn-btn-blue flex-1" style={{ fontSize: 16 }}>
+        <button onClick={() => setShowPlayMenu(true)} className="fn-btn fn-btn-blue flex-1" style={{ fontSize: 16 }}>
           PLAY NOW
         </button>
         <button onClick={() => setActiveTab('locker')} className="fn-btn fn-btn-outline" style={{ padding: '12px 20px' }}>
