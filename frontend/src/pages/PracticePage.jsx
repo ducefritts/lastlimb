@@ -136,10 +136,10 @@ const WORD_LISTS = {
 }
 
 const DIFFICULTY_CONFIG = {
-  easy:   { label: 'EASY',   color: '#00e676', maxWrong: 8, description: 'Short words, 8 lives' },
-  medium: { label: 'MEDIUM', color: '#ffd740', maxWrong: 7, description: 'Medium words, 7 lives' },
-  hard:   { label: 'HARD',   color: '#ff9800', maxWrong: 6, description: 'Long words, 6 lives' },
-  expert: { label: 'EXPERT', color: '#ff5252', maxWrong: 5, description: 'Rare words, 5 lives' },
+  easy:   { label: 'EASY',   color: '#00e676', maxWrong: 6, description: 'Short common words' },
+  medium: { label: 'MEDIUM', color: '#ffd740', maxWrong: 6, description: 'Medium length words' },
+  hard:   { label: 'HARD',   color: '#ff9800', maxWrong: 6, description: 'Longer harder words' },
+  expert: { label: 'EXPERT', color: '#ff5252', maxWrong: 6, description: 'Rare tricky words' },
 }
 
 function getRandomWord(difficulty) {
@@ -159,7 +159,7 @@ export default function PracticePage() {
   const [stats, setStats] = useState({ wins: 0, losses: 0, streak: 0 })
 
   const config = difficulty ? DIFFICULTY_CONFIG[difficulty] : null
-  const maxWrong = config?.maxWrong || 6
+  const maxWrong = 6
 
   const startGame = (diff) => {
     const { word: w, category: cat } = getRandomWord(diff)
