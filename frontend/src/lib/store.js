@@ -18,7 +18,7 @@ export const useStore = create((set, get) => ({
   matchmakingStatus: 'idle', // idle, searching, found
 
   // UI
-  activeTab: 'play',
+  activeTab: 'lobby',
 
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
@@ -68,8 +68,15 @@ export const useStore = create((set, get) => ({
   hasItem: (itemId) => get().unlockedItems.includes(itemId),
 
   getApiHeaders: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' }
+    // Refresh session to ensure token is valid
+    const { data: { session } } = await supabase.auth.refreshSession()
+    const token = session?.access_token
+    if (!token) {
+      // Fall back to current session
+      const { data: { session: current } } = await supabase.auth.getSession()
+      return { Authorization: `Bearer ${current?.access_token}`, 'Content-Type': 'application/json' }
+    }
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   },
 
   equipItem: async (slot, itemId) => {
