@@ -3,8 +3,7 @@ import { useStore } from '../lib/store'
 import { ALL_UNLOCKABLES, RARITY_COLORS, FONT_STYLES } from '../lib/gameData'
 import HangmanPixel from '../components/HangmanPixel'
 import toast from 'react-hot-toast'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+import { supabase } from '../lib/supabase'
 
 const SKIN_TONES = [
   { id: 'tan_1',    label: 'Light Tan',    color: '#f5e6d0' },
@@ -62,27 +61,15 @@ const PANTS_COLORS = [
   { id: 'white',  label: 'White',  color: '#e8e8e8' },
 ]
 
-const BODY_SLOTS = [
-  { key: 'skin',       label: 'SKIN TONE' },
-  { key: 'eyes',       label: 'EYE COLOR' },
-  { key: 'mouth',      label: 'MOUTH' },
-  { key: 'hair',       label: 'HAIR STYLE' },
-  { key: 'hair_color', label: 'HAIR COLOR' },
+const STYLE_SLOTS = [
+  { key: 'color',     label: 'BODY FX',   type: 'color' },
+  { key: 'hat',       label: 'HAT',       type: 'hat' },
+  { key: 'accessory', label: 'ACCESSORY', type: 'accessory' },
+  { key: 'gallows',   label: 'GALLOWS',   type: 'gallows' },
 ]
-
-const CLOTHES_SLOTS = [
-  { key: 'shirt',     label: 'SHIRT' },
-  { key: 'pants',     label: 'PANTS' },
-  { key: 'color',     label: 'BODY FX' },
-  { key: 'hat',       label: 'HAT' },
-  { key: 'accessory', label: 'ACCESSORY' },
-  { key: 'gallows',   label: 'GALLOWS' },
-]
-
-const FONT_SLOT = [{ key: 'font', label: 'FONT STYLE' }]
 
 export default function LockerPage() {
-  const { profile, user, unlockedItems, getApiHeaders, loadProfile, setActiveTab } = useStore()
+  const { profile, user, unlockedItems, loadProfile, setActiveTab } = useStore()
   const [section, setSection] = useState('body')
   const [activeSlot, setActiveSlot] = useState('skin')
   const [saving, setSaving] = useState(false)
@@ -107,7 +94,6 @@ export default function LockerPage() {
 
   const char = { ...baseChar, ...localChar }
 
-  // Just updates local preview — nothing saved yet
   const select = (charKey, charVal, dbKey, dbVal) => {
     setLocalChar(prev => ({ ...(prev || {}), [charKey]: charVal }))
     setPending(prev => ({ ...prev, [dbKey]: dbVal }))
@@ -119,8 +105,7 @@ export default function LockerPage() {
   }
 
   const unequip = (slot) => {
-    const defaultVal = slot === 'color' ? 'white' : slot === 'gallows' ? 'classic' : 'none'
-    equip(slot, defaultVal)
+    equip(slot, slot === 'color' ? 'white' : slot === 'gallows' ? 'classic' : 'none')
   }
 
   const hasPending = Object.keys(pending).length > 0
@@ -128,50 +113,53 @@ export default function LockerPage() {
   const saveAll = async () => {
     setSaving(true)
     try {
-      const headers = await getApiHeaders()
-
-      const charUpdates = {}
-      const equipUpdates = []
+      const updates = {}
       for (const [k, v] of Object.entries(pending)) {
         if (k.startsWith('equip_')) {
-          equipUpdates.push({ slot: k.replace('equip_', ''), itemId: v })
+          updates[`equipped_${k.replace('equip_', '')}`] = v
         } else {
-          charUpdates[k] = v
+          updates[k] = v
         }
       }
 
-      if (Object.keys(charUpdates).length > 0) {
-        const res = await fetch(`${API}/api/game/character`, { method: 'POST', headers, body: JSON.stringify(charUpdates) })
-        const data = await res.json()
-        if (!data.success) throw new Error(data.error || 'Character save failed')
-      }
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
 
-      for (const { slot, itemId } of equipUpdates) {
-        await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
-      }
+      if (error) throw new Error(error.message)
 
       await loadProfile(user.id)
       setPending({})
       setLocalChar(null)
-      toast.success('All changes saved!')
+      toast.success('Saved!')
     } catch (e) {
       toast.error(e.message || 'Failed to save')
       console.error('Save error:', e)
+    } finally {
+      setSaving(false)
     }
-    finally { setSaving(false) }
   }
 
   const slotItems = (type) => ALL_UNLOCKABLES.filter(i => i.type === type && unlockedItems.includes(i.id))
 
-  const currentSlots = section === 'body' ? BODY_SLOTS : section === 'style' ? CLOTHES_SLOTS : FONT_SLOT
+  const BODY_SLOTS = [
+    { key: 'skin',       label: 'SKIN TONE' },
+    { key: 'eyes',       label: 'EYE COLOR' },
+    { key: 'mouth',      label: 'MOUTH' },
+    { key: 'hair',       label: 'HAIR STYLE' },
+    { key: 'hair_color', label: 'HAIR COLOR' },
+  ]
 
-  const sectionBtnStyle = (s) => ({
-    fontSize: 13, padding: '10px',
-    background: section === s ? 'rgba(0,168,255,0.2)' : 'transparent',
-    border: `1px solid ${section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)'}`,
-    color: section === s ? '#00a8ff' : 'rgba(192,200,216,0.5)',
-    fontFamily: 'Barlow Condensed', fontWeight: 700, letterSpacing: 2,
-  })
+  const CLOTHES_SLOTS = [
+    { key: 'shirt',  label: 'SHIRT' },
+    { key: 'pants',  label: 'PANTS' },
+    ...STYLE_SLOTS.map(s => ({ key: s.key, label: s.label })),
+  ]
+
+  const FONT_SLOTS = [{ key: 'font', label: 'FONT STYLE' }]
+
+  const currentSlots = section === 'body' ? BODY_SLOTS : section === 'style' ? CLOTHES_SLOTS : FONT_SLOTS
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(160deg, #080c16 0%, #0a101e 100%)' }}>
@@ -196,7 +184,14 @@ export default function LockerPage() {
           <button key={s} onClick={() => {
             setSection(s)
             setActiveSlot(s === 'body' ? 'skin' : s === 'style' ? 'shirt' : 'font')
-          }} className="fn-btn flex-1" style={sectionBtnStyle(s)}>
+          }} style={{
+            fontSize: 13, padding: '10px', flex: 1,
+            fontFamily: 'Barlow Condensed', fontWeight: 700, letterSpacing: 2,
+            borderRadius: 2, cursor: 'pointer', border: '1px solid',
+            borderColor: section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)',
+            background: section === s ? 'rgba(0,168,255,0.2)' : 'transparent',
+            color: section === s ? '#00a8ff' : 'rgba(192,200,216,0.5)',
+          }}>
             {s === 'body' ? 'BODY' : s === 'style' ? 'STYLE' : 'FONT'}
           </button>
         ))}
@@ -225,7 +220,7 @@ export default function LockerPage() {
           <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.15)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.3)' }}>
             LEVEL {profile?.level || 1}
           </div>
-          {char.font && char.font !== 'none' && FONT_STYLES[char.font] && (
+          {char.font && char.font !== 'none' && FONT_STYLES?.[char.font] && (
             <div className="mt-3 px-3 py-2 text-center w-full" style={{ borderRadius: 3, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(192,200,216,0.1)' }}>
               <div style={{ fontFamily: 'Barlow Condensed', fontSize: 9, color: 'rgba(192,200,216,0.3)', letterSpacing: 1, marginBottom: 4 }}>ACTIVE FONT</div>
               <div style={{ ...FONT_STYLES[char.font], fontSize: 14 }}>HANGMAN</div>
@@ -358,10 +353,8 @@ export default function LockerPage() {
           )}
 
           {['color','hat','accessory','gallows'].includes(activeSlot) && (() => {
-            const typeMap = { color: 'color', hat: 'hat', accessory: 'accessory', gallows: 'gallows' }
-            const items = slotItems(typeMap[activeSlot])
+            const items = slotItems(activeSlot)
             const current = char[activeSlot]
-            const isDefault = current === 'none' || current === 'white' || current === 'classic'
             return (
               <div>
                 {items.length === 0 ? (
@@ -374,7 +367,7 @@ export default function LockerPage() {
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                     <button onClick={() => unequip(activeSlot)}
                       className="fn-card flex flex-col items-center p-3 transition-all"
-                      style={{ borderRadius: 3, border: `2px solid ${isDefault ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: isDefault ? 'rgba(0,168,255,0.1)' : '' }}>
+                      style={{ borderRadius: 3, border: `2px solid ${current === 'none' || current === 'white' || current === 'classic' ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: current === 'none' || current === 'white' || current === 'classic' ? 'rgba(0,168,255,0.1)' : '' }}>
                       <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>✕</div>
                       <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 10, color: 'rgba(192,200,216,0.5)', marginTop: 4 }}>NONE</div>
                     </button>
@@ -421,7 +414,7 @@ export default function LockerPage() {
                     </button>
                     {fontItems.map(item => {
                       const isEquipped = current === item.id
-                      const fontStyle = FONT_STYLES[item.id] || {}
+                      const fontStyle = FONT_STYLES?.[item.id] || {}
                       const rarityColor = RARITY_COLORS[item.rarity] || '#888'
                       return (
                         <button key={item.id} onClick={() => equip('font', item.id)}
