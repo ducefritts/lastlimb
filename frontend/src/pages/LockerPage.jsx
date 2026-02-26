@@ -6,7 +6,6 @@ import toast from 'react-hot-toast'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
-// ── Free body options ──────────────────────────────────
 const SKIN_TONES = [
   { id: 'tan_1',    label: 'Light Tan',    color: '#f5e6d0' },
   { id: 'tan_2',    label: 'Medium Tan',   color: '#e8c99a' },
@@ -64,10 +63,10 @@ const PANTS_COLORS = [
 ]
 
 const STYLE_SLOTS = [
-  { key: 'color',     label: 'BODY FX',    type: 'color' },
-  { key: 'hat',       label: 'HAT',        type: 'hat' },
-  { key: 'accessory', label: 'ACCESSORY',  type: 'accessory' },
-  { key: 'gallows',   label: 'GALLOWS',    type: 'gallows' },
+  { key: 'color',     label: 'BODY FX',   type: 'color' },
+  { key: 'hat',       label: 'HAT',       type: 'hat' },
+  { key: 'accessory', label: 'ACCESSORY', type: 'accessory' },
+  { key: 'gallows',   label: 'GALLOWS',   type: 'gallows' },
 ]
 
 export default function LockerPage() {
@@ -76,8 +75,8 @@ export default function LockerPage() {
   const [activeSlot, setActiveSlot] = useState('skin')
   const [saving, setSaving] = useState(false)
   const [eyeColorInput, setEyeColorInput] = useState(profile?.eye_color || '#4a90d9')
-
   const [localChar, setLocalChar] = useState(null)
+  const [pending, setPending] = useState({})
 
   const baseChar = {
     skinTone:   profile?.skin_tone   || 'tan_2',
@@ -93,52 +92,59 @@ export default function LockerPage() {
     gallows:    profile?.equipped_gallows   || 'classic',
   }
 
-  const char = localChar ? { ...baseChar, ...localChar } : baseChar
-  const getChar = () => char
+  const char = { ...baseChar, ...localChar }
 
-  const save = async (updates) => {
-    setSaving(true)
-    // Map update keys to char keys
-    const keyMap = { skin_tone: 'skinTone', eye_color: 'eyeColor', mouth_style: 'mouthStyle', hair_style: 'hairStyle', hair_color: 'hairColor', shirt_color: 'shirtColor', pants_color: 'pantsColor' }
-    const charUpdates = {}
-    for (const [k, v] of Object.entries(updates)) {
-      if (keyMap[k]) charUpdates[keyMap[k]] = v
-    }
-    setLocalChar(prev => ({ ...(prev || getChar()), ...charUpdates }))
-    try {
-      const headers = await getApiHeaders()
-      fetch(`${API}/api/game/character`, {
-        method: 'POST', headers,
-        body: JSON.stringify(updates)
-      })
-      toast.success('Saved!')
-    } catch (e) { toast.error('Failed to save') }
-    finally { setSaving(false) }
+  const select = (charKey, charVal, dbKey, dbVal) => {
+    setLocalChar(prev => ({ ...(prev || {}), [charKey]: charVal }))
+    setPending(prev => ({ ...prev, [dbKey]: dbVal }))
   }
 
-  const equip = async (slot, itemId) => {
-    setSaving(true)
-    setLocalChar(prev => ({ ...(prev || getChar()), [slot]: itemId }))
-    try {
-      const headers = await getApiHeaders()
-      const res = await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
-      const data = await res.json()
-      if (data.success) {
-        toast.success('Equipped!')
-      } else {
-        toast.error(data.error || 'Failed to equip')
-        console.error('Equip failed:', data)
-      }
-    } catch (e) { 
-      toast.error('Failed')
-      console.error('Equip error:', e)
-    }
-    finally { setSaving(false) }
+  const equip = (slot, itemId) => {
+    setLocalChar(prev => ({ ...(prev || {}), [slot]: itemId }))
+    setPending(prev => ({ ...prev, [`equip_${slot}`]: itemId }))
   }
 
-  const unequip = async (slot) => {
+  const unequip = (slot) => {
     const defaultVal = slot === 'color' ? 'white' : 'none'
-    await equip(slot, defaultVal)
+    equip(slot, defaultVal)
+  }
+
+  const hasPending = Object.keys(pending).length > 0
+
+  const saveAll = async () => {
+    setSaving(true)
+    try {
+      const headers = await getApiHeaders()
+
+      const charUpdates = {}
+      const equipUpdates = []
+      for (const [k, v] of Object.entries(pending)) {
+        if (k.startsWith('equip_')) {
+          equipUpdates.push({ slot: k.replace('equip_', ''), itemId: v })
+        } else {
+          charUpdates[k] = v
+        }
+      }
+
+      if (Object.keys(charUpdates).length > 0) {
+        const res = await fetch(`${API}/api/game/character`, { method: 'POST', headers, body: JSON.stringify(charUpdates) })
+        const data = await res.json()
+        if (!data.success) throw new Error(data.error || 'Character save failed')
+      }
+
+      for (const { slot, itemId } of equipUpdates) {
+        await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
+      }
+
+      await loadProfile(user.id)
+      setPending({})
+      setLocalChar(null)
+      toast.success('All changes saved!')
+    } catch (e) {
+      toast.error(e.message || 'Failed to save')
+      console.error('Save error:', e)
+    }
+    finally { setSaving(false) }
   }
 
   const slotItems = (type) => ALL_UNLOCKABLES.filter(i => i.type === type && unlockedItems.includes(i.id))
@@ -162,24 +168,31 @@ export default function LockerPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(160deg, #080c16 0%, #0a101e 100%)' }}>
 
-      {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div className="fn-heading text-3xl text-white">LOCKER</div>
-        <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>
-          GET MORE ITEMS
-        </button>
+        <div className="flex gap-2">
+          {hasPending && (
+            <button onClick={saveAll} disabled={saving}
+              className="fn-btn fn-btn-blue" style={{ fontSize: 13, padding: '8px 20px' }}>
+              {saving ? 'SAVING...' : 'SAVE CHANGES'}
+            </button>
+          )}
+          <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>
+            GET MORE ITEMS
+          </button>
+        </div>
       </div>
 
-      {/* Section toggle */}
       <div className="flex px-4 mb-4 gap-2">
         {['body', 'style'].map(s => (
           <button key={s} onClick={() => { setSection(s); setActiveSlot(s === 'body' ? 'skin' : 'shirt') }}
-            className="fn-btn flex-1" style={{
-              fontSize: 13, padding: '10px',
-              background: section === s ? 'rgba(0,168,255,0.2)' : 'transparent',
-              border: `1px solid ${section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)'}`,
-              color: section === s ? '#00a8ff' : 'rgba(192,200,216,0.5)',
+            style={{
+              fontSize: 13, padding: '10px', flex: 1,
               fontFamily: 'Barlow Condensed', fontWeight: 700, letterSpacing: 2,
+              borderRadius: 2, cursor: 'pointer', border: '1px solid',
+              borderColor: section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)',
+              background: section === s ? 'rgba(0,168,255,0.2)' : 'transparent',
+              color: section === s ? '#00a8ff' : 'rgba(192,200,216,0.5)',
             }}>
             {s === 'body' ? 'BODY' : 'STYLE'}
           </button>
@@ -188,7 +201,6 @@ export default function LockerPage() {
 
       <div className="flex flex-col md:flex-row flex-1 gap-4 px-4 pb-24">
 
-        {/* Character Preview */}
         <div className="fn-card flex flex-col items-center p-5 md:w-56 flex-shrink-0"
           style={{ borderRadius: 4, background: 'radial-gradient(ellipse at 50% 80%, rgba(0,168,255,0.07) 0%, transparent 65%)' }}>
           <HangmanPixel
@@ -212,9 +224,7 @@ export default function LockerPage() {
           </div>
         </div>
 
-        {/* Right panel */}
         <div className="flex-1 min-w-0">
-          {/* Slot tabs */}
           <div className="flex gap-1 mb-4 flex-wrap">
             {currentSlots.map(slot => (
               <button key={slot.key} onClick={() => setActiveSlot(slot.key)}
@@ -230,11 +240,10 @@ export default function LockerPage() {
             ))}
           </div>
 
-          {/* ── SKIN TONE ── */}
           {activeSlot === 'skin' && (
             <div className="grid grid-cols-3 gap-3">
               {SKIN_TONES.map(s => (
-                <button key={s.id} onClick={() => save({ skin_tone: s.id })}
+                <button key={s.id} onClick={() => select('skinTone', s.id, 'skin_tone', s.id)}
                   className="fn-card flex flex-col items-center p-3 transition-all"
                   style={{ borderRadius: 3, border: `2px solid ${char.skinTone === s.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.skinTone === s.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', background: s.color, border: '2px solid rgba(0,0,0,0.3)', marginBottom: 6 }} />
@@ -245,12 +254,9 @@ export default function LockerPage() {
             </div>
           )}
 
-          {/* ── EYE COLOR ── */}
           {activeSlot === 'eyes' && (
             <div className="fn-card p-5" style={{ borderRadius: 4 }}>
-              <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.5)', letterSpacing: 1, marginBottom: 16 }}>
-                PICK EYE COLOR
-              </div>
+              <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.5)', letterSpacing: 1, marginBottom: 16 }}>PICK EYE COLOR</div>
               <div className="flex items-center gap-4 mb-5">
                 <input type="color" value={eyeColorInput}
                   onChange={e => setEyeColorInput(e.target.value)}
@@ -260,7 +266,6 @@ export default function LockerPage() {
                   <div style={{ fontFamily: 'Barlow', fontSize: 13, color: 'rgba(192,200,216,0.4)', marginTop: 2 }}>Click the color wheel to pick any color</div>
                 </div>
               </div>
-              {/* Quick presets */}
               <div style={{ fontFamily: 'Barlow Condensed', fontSize: 11, color: 'rgba(192,200,216,0.4)', letterSpacing: 1, marginBottom: 10 }}>QUICK PRESETS</div>
               <div className="flex gap-2 flex-wrap mb-5">
                 {['#4a90d9','#2ecc40','#8B4513','#333333','#9B59B6','#e74c3c','#1abc9c','#ffd740'].map(c => (
@@ -268,18 +273,17 @@ export default function LockerPage() {
                     style={{ width: 32, height: 32, borderRadius: '50%', background: c, border: eyeColorInput === c ? '3px solid white' : '2px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} />
                 ))}
               </div>
-              <button onClick={() => save({ eye_color: eyeColorInput })}
+              <button onClick={() => select('eyeColor', eyeColorInput, 'eye_color', eyeColorInput)}
                 className="fn-btn fn-btn-blue" style={{ fontSize: 13 }}>
                 APPLY
               </button>
             </div>
           )}
 
-          {/* ── MOUTH ── */}
           {activeSlot === 'mouth' && (
             <div className="grid grid-cols-3 gap-3">
               {MOUTH_STYLES.map(m => (
-                <button key={m.id} onClick={() => save({ mouth_style: m.id })}
+                <button key={m.id} onClick={() => select('mouthStyle', m.id, 'mouth_style', m.id)}
                   className="fn-card flex flex-col items-center p-4 transition-all"
                   style={{ borderRadius: 3, border: `2px solid ${char.mouthStyle === m.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.mouthStyle === m.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>{m.preview}</div>
@@ -290,11 +294,10 @@ export default function LockerPage() {
             </div>
           )}
 
-          {/* ── HAIR STYLE ── */}
           {activeSlot === 'hair' && (
             <div className="grid grid-cols-4 gap-3">
               {HAIR_STYLES.map(h => (
-                <button key={h.id} onClick={() => save({ hair_style: h.id })}
+                <button key={h.id} onClick={() => select('hairStyle', h.id, 'hair_style', h.id)}
                   className="fn-card flex flex-col items-center p-3 transition-all"
                   style={{ borderRadius: 3, border: `2px solid ${char.hairStyle === h.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.hairStyle === h.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ fontSize: 28, marginBottom: 4 }}>
@@ -307,11 +310,10 @@ export default function LockerPage() {
             </div>
           )}
 
-          {/* ── HAIR COLOR ── */}
           {activeSlot === 'hair_color' && (
             <div className="grid grid-cols-2 gap-3">
               {HAIR_COLORS.map(h => (
-                <button key={h.id} onClick={() => save({ hair_color: h.id })}
+                <button key={h.id} onClick={() => select('hairColor', h.id, 'hair_color', h.id)}
                   className="fn-card flex items-center gap-3 p-4 transition-all"
                   style={{ borderRadius: 3, border: `2px solid ${char.hairColor === h.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.hairColor === h.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: h.color, border: '2px solid rgba(0,0,0,0.4)', flexShrink: 0 }} />
@@ -322,11 +324,10 @@ export default function LockerPage() {
             </div>
           )}
 
-          {/* ── SHIRT ── */}
           {activeSlot === 'shirt' && (
             <div className="grid grid-cols-3 gap-3">
               {SHIRT_COLORS.map(c => (
-                <button key={c.id} onClick={() => save({ shirt_color: c.id })}
+                <button key={c.id} onClick={() => select('shirtColor', c.id, 'shirt_color', c.id)}
                   className="fn-card flex flex-col items-center p-3 transition-all"
                   style={{ borderRadius: 3, border: `2px solid ${char.shirtColor === c.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.shirtColor === c.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ width: 40, height: 40, borderRadius: 4, background: c.color, border: '2px solid rgba(0,0,0,0.3)', marginBottom: 6 }} />
@@ -337,11 +338,10 @@ export default function LockerPage() {
             </div>
           )}
 
-          {/* ── PANTS ── */}
           {activeSlot === 'pants' && (
             <div className="grid grid-cols-3 gap-3">
               {PANTS_COLORS.map(c => (
-                <button key={c.id} onClick={() => save({ pants_color: c.id })}
+                <button key={c.id} onClick={() => select('pantsColor', c.id, 'pants_color', c.id)}
                   className="fn-card flex flex-col items-center p-3 transition-all"
                   style={{ borderRadius: 3, border: `2px solid ${char.pantsColor === c.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.pantsColor === c.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ width: 40, height: 40, borderRadius: 4, background: c.color, border: '2px solid rgba(0,0,0,0.3)', marginBottom: 6 }} />
@@ -352,7 +352,6 @@ export default function LockerPage() {
             </div>
           )}
 
-          {/* ── STYLE SLOTS (color, hat, accessory, gallows) ── */}
           {['color','hat','accessory','gallows'].includes(activeSlot) && (() => {
             const items = slotItems(activeSlot === 'color' ? 'color' : activeSlot === 'hat' ? 'hat' : activeSlot === 'accessory' ? 'accessory' : 'gallows')
             const current = char[activeSlot]
