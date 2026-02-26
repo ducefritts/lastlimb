@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { useStore } from '../lib/store'
-import { ALL_UNLOCKABLES, RARITY_COLORS } from '../lib/gameData'
+import { ALL_UNLOCKABLES, RARITY_COLORS, FONT_STYLES } from '../lib/gameData'
 import HangmanPixel from '../components/HangmanPixel'
 import toast from 'react-hot-toast'
-import { supabase } from '../lib/supabase'
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const SKIN_TONES = [
   { id: 'tan_1',    label: 'Light Tan',    color: '#f5e6d0' },
@@ -61,133 +62,121 @@ const PANTS_COLORS = [
   { id: 'white',  label: 'White',  color: '#e8e8e8' },
 ]
 
-const STYLE_SLOTS = [
-  { key: 'color',     label: 'BODY FX',   type: 'color' },
-  { key: 'hat',       label: 'HAT',       type: 'hat' },
-  { key: 'accessory', label: 'ACCESSORY', type: 'accessory' },
-  { key: 'gallows',   label: 'GALLOWS',   type: 'gallows' },
+const BODY_SLOTS = [
+  { key: 'skin',       label: 'SKIN TONE' },
+  { key: 'eyes',       label: 'EYE COLOR' },
+  { key: 'mouth',      label: 'MOUTH' },
+  { key: 'hair',       label: 'HAIR STYLE' },
+  { key: 'hair_color', label: 'HAIR COLOR' },
 ]
 
+const CLOTHES_SLOTS = [
+  { key: 'shirt',     label: 'SHIRT' },
+  { key: 'pants',     label: 'PANTS' },
+  { key: 'color',     label: 'BODY FX' },
+  { key: 'hat',       label: 'HAT' },
+  { key: 'accessory', label: 'ACCESSORY' },
+  { key: 'gallows',   label: 'GALLOWS' },
+]
+
+const FONT_SLOT = [{ key: 'font', label: 'FONT STYLE' }]
+
 export default function LockerPage() {
-  const { profile, user, unlockedItems, loadProfile, setActiveTab } = useStore()
+  const { profile, user, unlockedItems, getApiHeaders, loadProfile, setActiveTab } = useStore()
   const [section, setSection] = useState('body')
   const [activeSlot, setActiveSlot] = useState('skin')
   const [saving, setSaving] = useState(false)
   const [eyeColorInput, setEyeColorInput] = useState(profile?.eye_color || '#4a90d9')
   const [localChar, setLocalChar] = useState(null)
-  const [pending, setPending] = useState({})
 
   const baseChar = {
-    skinTone:   profile?.skin_tone   || 'tan_2',
-    eyeColor:   profile?.eye_color   || '#4a90d9',
-    mouthStyle: profile?.mouth_style || 'happy',
-    hairStyle:  profile?.hair_style  || 'short',
-    hairColor:  profile?.hair_color  || 'brown',
-    shirtColor: profile?.shirt_color || 'blue',
-    pantsColor: profile?.pants_color || 'navy',
+    skinTone:   profile?.skin_tone          || 'tan_2',
+    eyeColor:   profile?.eye_color          || '#4a90d9',
+    mouthStyle: profile?.mouth_style        || 'happy',
+    hairStyle:  profile?.hair_style         || 'short',
+    hairColor:  profile?.hair_color         || 'brown',
+    shirtColor: profile?.shirt_color        || 'blue',
+    pantsColor: profile?.pants_color        || 'navy',
     hat:        profile?.equipped_hat       || 'none',
     color:      profile?.equipped_color     || 'white',
     accessory:  profile?.equipped_accessory || 'none',
     gallows:    profile?.equipped_gallows   || 'classic',
+    font:       profile?.equipped_font      || 'none',
   }
 
-  const char = { ...baseChar, ...localChar }
+  const char = localChar ? { ...baseChar, ...localChar } : baseChar
+
+  const save = async (updates) => {
+    setSaving(true)
+    const keyMap = {
+      skin_tone: 'skinTone', eye_color: 'eyeColor', mouth_style: 'mouthStyle',
+      hair_style: 'hairStyle', hair_color: 'hairColor', shirt_color: 'shirtColor', pants_color: 'pantsColor'
+    }
+    const charUpdates = {}
+    for (const [k, v] of Object.entries(updates)) {
+      if (keyMap[k]) charUpdates[keyMap[k]] = v
+    }
+    setLocalChar(prev => ({ ...(prev || char), ...charUpdates }))
+    try {
+      const headers = await getApiHeaders()
+      await fetch(`${API}/api/game/character`, { method: 'POST', headers, body: JSON.stringify(updates) })
+      toast.success('Saved!')
+    } catch { toast.error('Failed to save') }
+    finally { setSaving(false) }
+  }
+
+  const equip = async (slot, itemId) => {
+    setSaving(true)
+    setLocalChar(prev => ({ ...(prev || char), [slot]: itemId }))
+    try {
+      const headers = await getApiHeaders()
+      const res = await fetch(`${API}/api/game/equip`, { method: 'POST', headers, body: JSON.stringify({ slot, itemId }) })
+      const data = await res.json()
+      if (data.success) toast.success('Equipped!')
+      else toast.error(data.error || 'Failed to equip')
+    } catch { toast.error('Failed') }
+    finally { setSaving(false) }
+  }
 
   const select = (charKey, charVal, dbKey, dbVal) => {
-    setLocalChar(prev => ({ ...(prev || {}), [charKey]: charVal }))
-    setPending(prev => ({ ...prev, [dbKey]: dbVal }))
+    setLocalChar(prev => ({ ...(prev || char), [charKey]: charVal }))
+    save({ [dbKey]: dbVal })
   }
 
-  const equip = (slot, itemId) => {
-    setLocalChar(prev => ({ ...(prev || {}), [slot]: itemId }))
-    setPending(prev => ({ ...prev, [`equip_${slot}`]: itemId }))
-  }
-
-  const unequip = (slot) => {
-    equip(slot, slot === 'color' ? 'white' : 'none')
-  }
-
-  const hasPending = Object.keys(pending).length > 0
-
-  const saveAll = async () => {
-    setSaving(true)
-    try {
-      const updates = {}
-      for (const [k, v] of Object.entries(pending)) {
-        if (k.startsWith('equip_')) {
-          updates[`equipped_${k.replace('equip_', '')}`] = v
-        } else {
-          updates[k] = v
-        }
-      }
-
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id)
-
-      if (error) throw new Error(error.message)
-
-      await loadProfile(user.id)
-      setPending({})
-      setLocalChar(null)
-      toast.success('Saved!')
-    } catch (e) {
-      toast.error(e.message || 'Failed to save')
-      console.error('Save error:', e)
-    } finally {
-      setSaving(false)
-    }
+  const unequip = async (slot) => {
+    const defaultVal = slot === 'color' ? 'white' : slot === 'gallows' ? 'classic' : 'none'
+    await equip(slot, defaultVal)
   }
 
   const slotItems = (type) => ALL_UNLOCKABLES.filter(i => i.type === type && unlockedItems.includes(i.id))
 
-  const BODY_SLOTS = [
-    { key: 'skin',       label: 'SKIN TONE' },
-    { key: 'eyes',       label: 'EYE COLOR' },
-    { key: 'mouth',      label: 'MOUTH' },
-    { key: 'hair',       label: 'HAIR STYLE' },
-    { key: 'hair_color', label: 'HAIR COLOR' },
-  ]
+  const currentSlots = section === 'body' ? BODY_SLOTS : section === 'style' ? CLOTHES_SLOTS : FONT_SLOT
 
-  const CLOTHES_SLOTS = [
-    { key: 'shirt',  label: 'SHIRT' },
-    { key: 'pants',  label: 'PANTS' },
-    ...STYLE_SLOTS.map(s => ({ key: s.key, label: s.label })),
-  ]
-
-  const currentSlots = section === 'body' ? BODY_SLOTS : CLOTHES_SLOTS
+  const sectionBtnStyle = (s) => ({
+    fontSize: 13, padding: '10px',
+    background: section === s ? 'rgba(0,168,255,0.2)' : 'transparent',
+    border: `1px solid ${section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)'}`,
+    color: section === s ? '#00a8ff' : 'rgba(192,200,216,0.5)',
+    fontFamily: 'Barlow Condensed', fontWeight: 700, letterSpacing: 2,
+  })
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(160deg, #080c16 0%, #0a101e 100%)' }}>
 
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <div className="fn-heading text-3xl text-white">LOCKER</div>
-        <div className="flex gap-2">
-          {hasPending && (
-            <button onClick={saveAll} disabled={saving}
-              className="fn-btn fn-btn-blue" style={{ fontSize: 13, padding: '8px 20px' }}>
-              {saving ? 'SAVING...' : 'SAVE CHANGES'}
-            </button>
-          )}
-          <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>
-            GET MORE ITEMS
-          </button>
-        </div>
+        <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-outline" style={{ fontSize: 12, padding: '8px 16px' }}>
+          GET MORE ITEMS
+        </button>
       </div>
 
       <div className="flex px-4 mb-4 gap-2">
-        {['body', 'style'].map(s => (
-          <button key={s} onClick={() => { setSection(s); setActiveSlot(s === 'body' ? 'skin' : 'shirt') }}
-            style={{
-              fontSize: 13, padding: '10px', flex: 1,
-              fontFamily: 'Barlow Condensed', fontWeight: 700, letterSpacing: 2,
-              borderRadius: 2, cursor: 'pointer', border: '1px solid',
-              borderColor: section === s ? '#00a8ff' : 'rgba(192,200,216,0.2)',
-              background: section === s ? 'rgba(0,168,255,0.2)' : 'transparent',
-              color: section === s ? '#00a8ff' : 'rgba(192,200,216,0.5)',
-            }}>
-            {s === 'body' ? 'BODY' : 'STYLE'}
+        {['body', 'style', 'font'].map(s => (
+          <button key={s} onClick={() => {
+            setSection(s)
+            setActiveSlot(s === 'body' ? 'skin' : s === 'style' ? 'shirt' : 'font')
+          }} className="fn-btn flex-1" style={sectionBtnStyle(s)}>
+            {s === 'body' ? 'BODY' : s === 'style' ? 'STYLE' : 'FONT'}
           </button>
         ))}
       </div>
@@ -215,6 +204,12 @@ export default function LockerPage() {
           <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.15)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.3)' }}>
             LEVEL {profile?.level || 1}
           </div>
+          {char.font && char.font !== 'none' && FONT_STYLES[char.font] && (
+            <div className="mt-3 px-3 py-2 text-center w-full" style={{ borderRadius: 3, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(192,200,216,0.1)' }}>
+              <div style={{ fontFamily: 'Barlow Condensed', fontSize: 9, color: 'rgba(192,200,216,0.3)', letterSpacing: 1, marginBottom: 4 }}>ACTIVE FONT</div>
+              <div style={{ ...FONT_STYLES[char.font], fontSize: 14 }}>HANGMAN</div>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -241,7 +236,7 @@ export default function LockerPage() {
                   style={{ borderRadius: 3, border: `2px solid ${char.skinTone === s.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.skinTone === s.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', background: s.color, border: '2px solid rgba(0,0,0,0.3)', marginBottom: 6 }} />
                   <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 11, color: 'rgba(192,200,216,0.7)', textAlign: 'center' }}>{s.label}</div>
-                  {char.skinTone === s.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>SELECTED</div>}
+                  {char.skinTone === s.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>ON</div>}
                 </button>
               ))}
             </div>
@@ -251,8 +246,7 @@ export default function LockerPage() {
             <div className="fn-card p-5" style={{ borderRadius: 4 }}>
               <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 13, color: 'rgba(192,200,216,0.5)', letterSpacing: 1, marginBottom: 16 }}>PICK EYE COLOR</div>
               <div className="flex items-center gap-4 mb-5">
-                <input type="color" value={eyeColorInput}
-                  onChange={e => setEyeColorInput(e.target.value)}
+                <input type="color" value={eyeColorInput} onChange={e => setEyeColorInput(e.target.value)}
                   style={{ width: 64, height: 64, borderRadius: 4, border: '2px solid rgba(192,200,216,0.2)', cursor: 'pointer', background: 'none', padding: 2 }} />
                 <div>
                   <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 18, color: 'white' }}>{eyeColorInput.toUpperCase()}</div>
@@ -266,10 +260,7 @@ export default function LockerPage() {
                     style={{ width: 32, height: 32, borderRadius: '50%', background: c, border: eyeColorInput === c ? '3px solid white' : '2px solid rgba(255,255,255,0.2)', cursor: 'pointer' }} />
                 ))}
               </div>
-              <button onClick={() => select('eyeColor', eyeColorInput, 'eye_color', eyeColorInput)}
-                className="fn-btn fn-btn-blue" style={{ fontSize: 13 }}>
-                APPLY
-              </button>
+              <button onClick={() => select('eyeColor', eyeColorInput, 'eye_color', eyeColorInput)} className="fn-btn fn-btn-blue" style={{ fontSize: 13 }}>APPLY</button>
             </div>
           )}
 
@@ -281,7 +272,7 @@ export default function LockerPage() {
                   style={{ borderRadius: 3, border: `2px solid ${char.mouthStyle === m.id ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: char.mouthStyle === m.id ? 'rgba(0,168,255,0.1)' : '' }}>
                   <div style={{ fontSize: 32, marginBottom: 6 }}>{m.preview}</div>
                   <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 12, color: 'rgba(192,200,216,0.7)' }}>{m.label}</div>
-                  {char.mouthStyle === m.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>SELECTED</div>}
+                  {char.mouthStyle === m.id && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>ON</div>}
                 </button>
               ))}
             </div>
@@ -346,8 +337,10 @@ export default function LockerPage() {
           )}
 
           {['color','hat','accessory','gallows'].includes(activeSlot) && (() => {
-            const items = slotItems(activeSlot)
+            const typeMap = { color: 'color', hat: 'hat', accessory: 'accessory', gallows: 'gallows' }
+            const items = slotItems(typeMap[activeSlot])
             const current = char[activeSlot]
+            const isDefault = current === 'none' || current === 'white' || current === 'classic'
             return (
               <div>
                 {items.length === 0 ? (
@@ -360,9 +353,10 @@ export default function LockerPage() {
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                     <button onClick={() => unequip(activeSlot)}
                       className="fn-card flex flex-col items-center p-3 transition-all"
-                      style={{ borderRadius: 3, border: `2px solid ${current === 'none' || current === 'white' ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: current === 'none' || current === 'white' ? 'rgba(0,168,255,0.1)' : '' }}>
+                      style={{ borderRadius: 3, border: `2px solid ${isDefault ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: isDefault ? 'rgba(0,168,255,0.1)' : '' }}>
                       <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>✕</div>
                       <div style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 10, color: 'rgba(192,200,216,0.5)', marginTop: 4 }}>NONE</div>
+                      {isDefault && <div className="fn-badge mt-1" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 8 }}>ON</div>}
                     </button>
                     {items.map(item => {
                       const isEquipped = current === item.id
@@ -384,6 +378,47 @@ export default function LockerPage() {
               </div>
             )
           })()}
+
+          {activeSlot === 'font' && (() => {
+            const fontItems = slotItems('font')
+            const current = char.font
+            return (
+              <div>
+                {fontItems.length === 0 ? (
+                  <div className="fn-card p-10 text-center" style={{ borderRadius: 4 }}>
+                    <div className="fn-heading text-xl mb-2" style={{ color: 'rgba(192,200,216,0.2)' }}>NO FONTS</div>
+                    <div style={{ color: 'rgba(192,200,216,0.3)', fontFamily: 'Barlow', fontSize: 14, marginBottom: 20 }}>Unlock fonts in the store or season pass!</div>
+                    <button onClick={() => setActiveTab('store')} className="fn-btn fn-btn-blue" style={{ fontSize: 13 }}>VISIT STORE</button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <button onClick={() => equip('font', 'none')}
+                      className="fn-card flex items-center gap-4 p-4 transition-all"
+                      style={{ borderRadius: 3, border: `2px solid ${!current || current === 'none' ? '#00a8ff' : 'rgba(192,200,216,0.1)'}`, background: !current || current === 'none' ? 'rgba(0,168,255,0.1)' : '' }}>
+                      <div style={{ width: 80, fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 11, color: 'rgba(192,200,216,0.4)', letterSpacing: 1 }}>DEFAULT</div>
+                      <div style={{ flex: 1, fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: 'rgba(192,200,216,0.8)', letterSpacing: 3 }}>HANGMAN</div>
+                      {(!current || current === 'none') && <div className="fn-badge" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 9 }}>ON</div>}
+                    </button>
+                    {fontItems.map(item => {
+                      const isEquipped = current === item.id
+                      const fontStyle = FONT_STYLES[item.id] || {}
+                      const rarityColor = RARITY_COLORS[item.rarity] || '#888'
+                      return (
+                        <button key={item.id} onClick={() => equip('font', item.id)}
+                          className="fn-card flex items-center gap-4 p-4 transition-all"
+                          style={{ borderRadius: 3, border: `2px solid ${isEquipped ? '#00a8ff' : `${rarityColor}44`}`, background: isEquipped ? 'rgba(0,168,255,0.1)' : '' }}>
+                          <div style={{ width: 80, fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 11, color: rarityColor, letterSpacing: 1, textTransform: 'uppercase' }}>{item.name}</div>
+                          <div style={{ flex: 1, ...fontStyle, fontSize: 20, letterSpacing: 3 }}>HANGMAN</div>
+                          {isEquipped && <div className="fn-badge" style={{ background: 'rgba(0,168,255,0.2)', color: '#00a8ff', border: '1px solid rgba(0,168,255,0.4)', fontSize: 9 }}>ON</div>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
         </div>
       </div>
     </div>
