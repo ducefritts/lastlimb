@@ -12,7 +12,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: '*',
     methods: ['GET', 'POST']
   }
 });
@@ -25,7 +25,23 @@ const supabase = createClient(
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(cors({
+  origin: function(origin, callback) {
+    const allowed = [
+      process.env.FRONTEND_URL,
+      'http://localhost:5173',
+      'https://lastlimb-frontend.vercel.app',
+    ].filter(Boolean);
+    if (!origin || allowed.some(a => origin.startsWith(a))) {
+      callback(null, true);
+    } else {
+      callback(null, true); // allow all for now
+    }
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+}));
 app.use(express.json());
 
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
