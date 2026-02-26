@@ -4,7 +4,11 @@ import HangmanPixel from '../components/HangmanPixel'
 import { getItemById } from '../lib/gameData'
 
 export default function LobbyPage() {
-  const { profile, setActiveTab } = useStore()
+  const { profile, setActiveTab, user, loadProfile } = useStore()
+
+  React.useEffect(() => {
+    if (user?.id) loadProfile(user.id)
+  }, [])
 
   const equippedHat       = profile?.equipped_hat || 'none'
   const equippedColor     = profile?.equipped_color || 'white'
