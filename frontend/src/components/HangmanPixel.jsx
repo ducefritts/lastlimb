@@ -1,29 +1,15 @@
 import React from 'react'
 
 const SKIN_TONES = {
-  // Tan shades
   tan_1:    { fill: '#f5e6d0', stroke: '#d4b896' },
   tan_2:    { fill: '#e8c99a', stroke: '#c4a060' },
   tan_3:    { fill: '#d4a96a', stroke: '#aa7a3a' },
-  // Brown shades
   brown_1:  { fill: '#c68642', stroke: '#9a5f20' },
   brown_2:  { fill: '#8d5524', stroke: '#6b3a10' },
   brown_3:  { fill: '#5c3317', stroke: '#3d1f08' },
-  // Yellowish tan
   yellow_1: { fill: '#f0d9a0', stroke: '#c8aa60' },
   yellow_2: { fill: '#e8c870', stroke: '#c0a040' },
   yellow_3: { fill: '#d4aa50', stroke: '#aa7e20' },
-}
-
-const HAIR_STYLES = {
-  short:       'short',
-  long:        'long',
-  curly:       'curly',
-  mohawk:      'mohawk',
-  bald:        'bald',
-  ponytail:    'ponytail',
-  spiky:       'spiky',
-  afro:        'afro',
 }
 
 const HAIR_COLORS = {
@@ -160,25 +146,25 @@ export default function HangmanPixel({
   size = 200,
 }) {
   const maxWrong = 6
-  const remainingParts = maxWrong - wrongGuesses
-  const showRightLeg  = remainingParts >= 1
-  const showLeftLeg   = remainingParts >= 2
-  const showRightArm  = remainingParts >= 3
-  const showLeftArm   = remainingParts >= 4
-  const showBody      = remainingParts >= 5
-  const showHead      = remainingParts >= 6
-  const isDead        = wrongGuesses >= maxWrong
 
-  const gc     = GALLOWS_COLORS[equippedGallows] || GALLOWS_COLORS.classic
-  const skin   = SKIN_TONES[skinTone] || SKIN_TONES.tan_2
-  const shirt  = SHIRT_COLORS[shirtColor] || SHIRT_COLORS.blue
-  const pants  = PANTS_COLORS[pantsColor] || PANTS_COLORS.navy
+  // Lose parts in order: right leg first, head last
+  const showRightLeg = wrongGuesses < 1
+  const showLeftLeg  = wrongGuesses < 2
+  const showRightArm = wrongGuesses < 3
+  const showLeftArm  = wrongGuesses < 4
+  const showBody     = wrongGuesses < 5
+  const showHead     = wrongGuesses < 6
+  const isDead       = wrongGuesses >= maxWrong
+
+  const gc    = GALLOWS_COLORS[equippedGallows] || GALLOWS_COLORS.classic
+  const skin  = SKIN_TONES[skinTone] || SKIN_TONES.tan_2
+  const shirt = SHIRT_COLORS[shirtColor] || SHIRT_COLORS.blue
+  const pants = PANTS_COLORS[pantsColor] || PANTS_COLORS.navy
 
   const gallowsStyle = {
     stroke: gc.stroke, strokeWidth: 4, strokeLinecap: 'round', fill: 'none',
     filter: gc.glow ? `drop-shadow(0 0 4px ${gc.glow})` : undefined
   }
-  const bodyStroke = { stroke: skin.fill, strokeWidth: 3, strokeLinecap: 'round', fill: 'none' }
 
   return (
     <svg viewBox="0 0 200 240" width={size} height={size * 1.2} style={{ overflow: 'visible' }}>
@@ -199,7 +185,7 @@ export default function HangmanPixel({
       {/* RIGHT LEG */}
       {showRightLeg && (
         <g>
-          <path d={`M130 170 L145 212 L156 212 L142 170 Z`} fill={pants.fill} stroke={pants.stroke} strokeWidth={2.5} strokeLinejoin="round" />
+          <path d="M130 170 L145 212 L156 212 L142 170 Z" fill={pants.fill} stroke={pants.stroke} strokeWidth={2.5} strokeLinejoin="round" />
           <ellipse cx="151" cy="214" rx="10" ry="5" fill="#222" stroke="#000" strokeWidth={2} />
           <line x1="133" y1="175" x2="143" y2="207" stroke="rgba(255,255,255,0.1)" strokeWidth={1.5} />
         </g>
@@ -208,7 +194,7 @@ export default function HangmanPixel({
       {/* LEFT LEG */}
       {showLeftLeg && (
         <g>
-          <path d={`M130 170 L115 212 L104 212 L118 170 Z`} fill={pants.fill} stroke={pants.stroke} strokeWidth={2.5} strokeLinejoin="round" />
+          <path d="M130 170 L115 212 L104 212 L118 170 Z" fill={pants.fill} stroke={pants.stroke} strokeWidth={2.5} strokeLinejoin="round" />
           <ellipse cx="109" cy="214" rx="10" ry="5" fill="#222" stroke="#000" strokeWidth={2} />
           <line x1="127" y1="175" x2="117" y2="207" stroke="rgba(255,255,255,0.1)" strokeWidth={1.5} />
         </g>
@@ -256,7 +242,6 @@ export default function HangmanPixel({
       {/* HEAD */}
       {showHead && (
         <g>
-          {/* Angel wings behind body */}
           {equippedAccessory === 'accessory_wings' && (
             <g style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.5))' }}>
               <path d="M108 110 Q80 90 85 120 Q90 140 108 130 Z" fill="white" stroke="#ddd" strokeWidth={2} />
@@ -277,7 +262,6 @@ export default function HangmanPixel({
             </>
           ) : (
             <>
-              {/* Eyes */}
               <ellipse cx="124" cy="75" rx="4" ry="4.5" fill="white" stroke={skin.stroke} strokeWidth={1} />
               <ellipse cx="136" cy="75" rx="4" ry="4.5" fill="white" stroke={skin.stroke} strokeWidth={1} />
               <ellipse cx="124" cy="75" rx="2.5" ry="3" fill={eyeColor} />
@@ -286,19 +270,15 @@ export default function HangmanPixel({
               <circle cx="136" cy="74" r="1.5" fill="#111" />
               <circle cx="124.8" cy="73.2" r="0.8" fill="white" />
               <circle cx="136.8" cy="73.2" r="0.8" fill="white" />
-              {/* Mouth */}
               <MouthPath style={mouthStyle} cx={130} cy={87} skinStroke={skin.stroke} />
             </>
           )}
 
-          {/* Ears */}
           <ellipse cx="108" cy="78" rx="4" ry="6" fill={skin.fill} stroke={skin.stroke} strokeWidth={2} />
           <ellipse cx="152" cy="78" rx="4" ry="6" fill={skin.fill} stroke={skin.stroke} strokeWidth={2} />
 
-          {/* Hair */}
           <HairPath style={hairStyle} color={hairColor} cx={130} headTop={54} />
 
-          {/* HAT — drawn on top of hair */}
           {equippedHat === 'hat_cap' && (
             <g>
               <ellipse cx="130" cy="56" rx="24" ry="6" fill="#cc2200" stroke="#881100" strokeWidth={2} />
@@ -343,7 +323,6 @@ export default function HangmanPixel({
             </g>
           )}
 
-          {/* ACCESSORY on face */}
           {equippedAccessory === 'accessory_glasses' && (
             <g>
               <circle cx="124" cy="75" r="6" fill="rgba(100,200,255,0.2)" stroke="#111" strokeWidth={2.5} />
@@ -366,7 +345,6 @@ export default function HangmanPixel({
         </g>
       )}
 
-      {/* Wrong counter */}
       <text x="14" y="26" fill={gc.stroke} fontSize="10" fontFamily="'Barlow Condensed', sans-serif" fontWeight="700" letterSpacing="1">
         {wrongGuesses}/{maxWrong}
       </text>
