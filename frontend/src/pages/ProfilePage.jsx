@@ -49,7 +49,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen p-4 max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <div className="fn-card flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: '50%', fontSize: 24 }}>
           {profile?.username?.[0]?.toUpperCase() || '?'}
@@ -62,7 +61,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b mb-5" style={{ borderColor: 'rgba(192,200,216,0.1)' }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} className={`fn-tab ${tab === t.id ? 'active' : ''}`}>
@@ -73,15 +71,23 @@ export default function ProfilePage() {
 
       {tab === 'customize' && (
         <div className="flex flex-col gap-6">
-          {/* Preview */}
           <div className="fn-card p-6 flex justify-center" style={{ borderRadius: 4, background: 'radial-gradient(ellipse at 50% 100%, rgba(0,168,255,0.06) 0%, transparent 60%)' }}>
             <div style={{ width: 180 }}>
-              <HangmanPixel wrongGuesses={0} equippedHat={equippedHat} equippedColor={equippedColor}
-                equippedAccessory={equippedAccessory} equippedGallows={equippedGallows} />
+              <HangmanPixel wrongGuesses={0}
+                equippedHat={equippedHat}
+                equippedColor={equippedColor}
+                equippedAccessory={equippedAccessory}
+                equippedGallows={equippedGallows}
+                skinTone={profile?.skin_tone || 'tan_2'}
+                eyeColor={profile?.eye_color || '#4a90d9'}
+                mouthStyle={profile?.mouth_style || 'happy'}
+                hairStyle={profile?.hair_style || 'short'}
+                hairColor={profile?.hair_color || 'brown'}
+                shirtColor={profile?.shirt_color || 'blue'}
+                pantsColor={profile?.pants_color || 'navy'} />
             </div>
           </div>
 
-          {/* Slots */}
           {[
             { label: 'COLOR', type: 'color', slot: 'color', current: equippedColor },
             { label: 'HAT', type: 'hat', slot: 'hat', current: equippedHat },
